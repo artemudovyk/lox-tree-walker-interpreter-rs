@@ -83,4 +83,11 @@ mod tests {
         let token = lexer.next_token();
         assert_eq!(token.kind, TokenKind::LeftParen);
     }
+
+    #[test]
+    fn lex_right_paren() {
+        let mut lexer = Lexer::new(")");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::RightParen);
+    }
 }
