@@ -25,8 +25,9 @@ impl Display for Token {
         match self.kind {
             TokenKind::LeftParen => f.write_str("LEFT_PAREN ( null"),
             TokenKind::RightParen => f.write_str("RIGHT_PAREN ) null"),
-            TokenKind::Whitespace => f.write_str("Whitespace  null"),
-            TokenKind::Eof => f.write_str("Eof  null"),
+            // TODO: remove?
+            TokenKind::Whitespace => f.write_str("WHITESPACE  null"),
+            TokenKind::Eof => f.write_str("EOF  null"),
         }
     }
 }
