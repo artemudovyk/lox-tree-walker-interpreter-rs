@@ -4,6 +4,8 @@ use std::{fmt::Display, str::Chars};
 pub enum TokenKind {
     LeftParen,
     RightParen,
+    /// Any whitespace char
+    Whitespace,
     Eof,
 }
 
@@ -23,6 +25,7 @@ impl Display for Token {
         match self.kind {
             TokenKind::LeftParen => f.write_str("LEFT_PAREN ( null"),
             TokenKind::RightParen => f.write_str("RIGHT_PAREN ) null"),
+            TokenKind::Whitespace => f.write_str("Whitespace  null"),
             TokenKind::Eof => f.write_str("Eof  null"),
         }
     }
@@ -63,10 +66,13 @@ impl<'src> Lexer<'src> {
             return Token::new(TokenKind::Eof, 0);
         };
 
+        dbg!(&char);
+
         let token_kind = match char {
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
-            _ => todo!(),
+            '\n' => TokenKind::Whitespace,
+            _ => TokenKind::Eof,
         };
 
         Token::new(token_kind, 0)
@@ -89,5 +95,12 @@ mod tests {
         let mut lexer = Lexer::new(")");
         let token = lexer.next_token();
         assert_eq!(token.kind, TokenKind::RightParen);
+    }
+
+    #[test]
+    fn empty_string_produces_eof_token() {
+        let mut lexer = Lexer::new("");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Eof);
     }
 }

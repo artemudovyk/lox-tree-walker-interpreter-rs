@@ -29,7 +29,11 @@ fn main() {
             loop {
                 let token = lexer.next_token();
 
-                format!("{token}");
+                if matches!(token.kind, TokenKind::Whitespace) {
+                    continue;
+                }
+
+                println!("{token}");
 
                 if matches!(token.kind, TokenKind::Eof) {
                     break;
