@@ -2,8 +2,14 @@ use std::{fmt::Display, str::Chars};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
+    /// `(`
     LeftParen,
+    /// `)`
     RightParen,
+    /// `{`
+    LeftBrace,
+    /// `}`
+    RightBrace,
     /// Any whitespace char
     Whitespace,
     Eof,
@@ -25,6 +31,8 @@ impl Display for Token {
         match self.kind {
             TokenKind::LeftParen => f.write_str("LEFT_PAREN ( null"),
             TokenKind::RightParen => f.write_str("RIGHT_PAREN ) null"),
+            TokenKind::LeftBrace => f.write_str("LEFT_BRACE { null"),
+            TokenKind::RightBrace => f.write_str("RIGHT_BRACE } null"),
             // TODO: remove?
             TokenKind::Whitespace => f.write_str("WHITESPACE  null"),
             TokenKind::Eof => f.write_str("EOF  null"),
@@ -72,6 +80,8 @@ impl<'src> Lexer<'src> {
         let token_kind = match char {
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
+            '{' => TokenKind::LeftBrace,
+            '}' => TokenKind::RightBrace,
             '\n' => TokenKind::Whitespace,
             _ => TokenKind::Eof,
         };
@@ -96,6 +106,20 @@ mod tests {
         let mut lexer = Lexer::new(")");
         let token = lexer.next_token();
         assert_eq!(token.kind, TokenKind::RightParen);
+    }
+
+    #[test]
+    fn lex_left_brace() {
+        let mut lexer = Lexer::new("{");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::LeftBrace);
+    }
+
+    #[test]
+    fn lex_right_brace() {
+        let mut lexer = Lexer::new("}");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::RightBrace);
     }
 
     #[test]
