@@ -10,6 +10,18 @@ pub enum TokenKind {
     LeftBrace,
     /// `}`
     RightBrace,
+    /// `,`
+    Comma,
+    /// `.`
+    Dot,
+    /// `-`
+    Dash,
+    /// `+`
+    Plus,
+    /// `;`
+    Semicolon,
+    /// `*`
+    Star,
     /// Any whitespace char
     Whitespace,
     Eof,
@@ -33,6 +45,12 @@ impl Display for Token {
             TokenKind::RightParen => f.write_str("RIGHT_PAREN ) null"),
             TokenKind::LeftBrace => f.write_str("LEFT_BRACE { null"),
             TokenKind::RightBrace => f.write_str("RIGHT_BRACE } null"),
+            TokenKind::Comma => f.write_str("COMMA } null"),
+            TokenKind::Dot => f.write_str("DOT } null"),
+            TokenKind::Dash => f.write_str("DASH } null"),
+            TokenKind::Plus => f.write_str("PLUS } null"),
+            TokenKind::Semicolon => f.write_str("SEMICOLON } null"),
+            TokenKind::Star => f.write_str("STAR } null"),
             // TODO: remove?
             TokenKind::Whitespace => f.write_str("WHITESPACE  null"),
             TokenKind::Eof => f.write_str("EOF  null"),
@@ -120,6 +138,48 @@ mod tests {
         let mut lexer = Lexer::new("}");
         let token = lexer.next_token();
         assert_eq!(token.kind, TokenKind::RightBrace);
+    }
+
+    #[test]
+    fn lex_comma() {
+        let mut lexer = Lexer::new(",");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Comma);
+    }
+
+    #[test]
+    fn lex_dot() {
+        let mut lexer = Lexer::new(".");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Dot);
+    }
+
+    #[test]
+    fn lex_dash() {
+        let mut lexer = Lexer::new("-");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Dash);
+    }
+
+    #[test]
+    fn lex_plus() {
+        let mut lexer = Lexer::new("+");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Plus);
+    }
+
+    #[test]
+    fn lex_semicolon() {
+        let mut lexer = Lexer::new(";");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Semicolon);
+    }
+
+    #[test]
+    fn lex_star() {
+        let mut lexer = Lexer::new("*");
+        let token = lexer.next_token();
+        assert_eq!(token.kind, TokenKind::Star);
     }
 
     #[test]
