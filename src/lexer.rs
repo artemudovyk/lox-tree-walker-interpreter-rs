@@ -100,6 +100,12 @@ impl<'src> Lexer<'src> {
             ')' => TokenKind::RightParen,
             '{' => TokenKind::LeftBrace,
             '}' => TokenKind::RightBrace,
+            '*' => TokenKind::Star,
+            ',' => TokenKind::Comma,
+            '.' => TokenKind::Dot,
+            '+' => TokenKind::Plus,
+            '-' => TokenKind::Dash,
+            ';' => TokenKind::Semicolon,
             '\n' => TokenKind::Whitespace,
             _ => TokenKind::Eof,
         };
