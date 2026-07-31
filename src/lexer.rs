@@ -15,7 +15,7 @@ pub enum TokenKind {
     /// `.`
     Dot,
     /// `-`
-    Dash,
+    Minus,
     /// `+`
     Plus,
     /// `;`
@@ -47,7 +47,7 @@ impl Display for Token {
             TokenKind::RightBrace => f.write_str("RIGHT_BRACE } null"),
             TokenKind::Comma => f.write_str("COMMA , null"),
             TokenKind::Dot => f.write_str("DOT . null"),
-            TokenKind::Dash => f.write_str("DASH - null"),
+            TokenKind::Minus => f.write_str("MINUS - null"),
             TokenKind::Plus => f.write_str("PLUS + null"),
             TokenKind::Semicolon => f.write_str("SEMICOLON ; null"),
             TokenKind::Star => f.write_str("STAR * null"),
@@ -104,7 +104,7 @@ impl<'src> Lexer<'src> {
             ',' => TokenKind::Comma,
             '.' => TokenKind::Dot,
             '+' => TokenKind::Plus,
-            '-' => TokenKind::Dash,
+            '-' => TokenKind::Minus,
             ';' => TokenKind::Semicolon,
             '\n' => TokenKind::Whitespace,
             _ => TokenKind::Eof,
@@ -164,7 +164,7 @@ mod tests {
     fn lex_dash() {
         let mut lexer = Lexer::new("-");
         let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Dash);
+        assert_eq!(token.kind, TokenKind::Minus);
     }
 
     #[test]
