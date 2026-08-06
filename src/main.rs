@@ -47,19 +47,19 @@ fn main() {
     }
 }
 
-fn format_token(t: &Token) -> Option<&'static str> {
+fn format_token(t: &Token) -> Option<String> {
     match t.kind {
-        TokenKind::LeftParen => Some("LEFT_PAREN ( null"),
-        TokenKind::RightParen => Some("RIGHT_PAREN ) null"),
-        TokenKind::LeftBrace => Some("LEFT_BRACE { null"),
-        TokenKind::RightBrace => Some("RIGHT_BRACE } null"),
-        TokenKind::Comma => Some("COMMA , null"),
-        TokenKind::Dot => Some("DOT . null"),
-        TokenKind::Minus => Some("MINUS - null"),
-        TokenKind::Plus => Some("PLUS + null"),
-        TokenKind::Semicolon => Some("SEMICOLON ; null"),
-        TokenKind::Star => Some("STAR * null"),
-        TokenKind::Unknown { ch, line } => Some("[line {line}] Unexpected character: $"),
+        TokenKind::LeftParen => Some("LEFT_PAREN ( null".to_string()),
+        TokenKind::RightParen => Some("RIGHT_PAREN ) null".to_string()),
+        TokenKind::LeftBrace => Some("LEFT_BRACE { null".to_string()),
+        TokenKind::RightBrace => Some("RIGHT_BRACE } null".to_string()),
+        TokenKind::Comma => Some("COMMA , null".to_string()),
+        TokenKind::Dot => Some("DOT . null".to_string()),
+        TokenKind::Minus => Some("MINUS - null".to_string()),
+        TokenKind::Plus => Some("PLUS + null".to_string()),
+        TokenKind::Semicolon => Some("SEMICOLON ; null".to_string()),
+        TokenKind::Star => Some("STAR * null".to_string()),
+        TokenKind::Unknown { ch, line } => Some(format!("[line {line}] Unexpected character: $")),
         TokenKind::Whitespace | TokenKind::Eof => None,
     }
 }
