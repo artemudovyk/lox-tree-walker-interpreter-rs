@@ -13,7 +13,7 @@ pub enum TokenKind {
     Semicolon,
     Star,
     Whitespace,
-    Unknown,
+    Unknown { ch: char, line: usize },
     Eof,
 }
 
@@ -38,18 +38,24 @@ impl Token {
 struct Cursor<'a> {
     /// Iterator over src chars
     chars: Peekable<Chars<'a>>,
+    cur_line: usize,
 }
 
 impl<'a> Cursor<'a> {
     fn new(chars: Chars<'a>) -> Self {
         Self {
             chars: chars.peekable(),
+            cur_line: 1,
         }
     }
 
     /// Returns next char and moves the cursor
     fn bump(&mut self) -> Option<char> {
-        self.chars.next()
+        let ch = self.chars.next();
+        if ch == Some('\n') {
+            self.cur_line += 1;
+        }
+        ch
     }
 
     fn peek(&mut self) -> Option<&char> {
@@ -76,10 +82,12 @@ impl<'src> Lexer<'src> {
             return Token::eof();
         };
 
+        let mut len = 1;
         let token_kind = match ch {
             c if c.is_whitespace() => {
                 while self.cursor.peek().is_some_and(|v| v.is_whitespace()) {
                     self.cursor.bump();
+                    len += 1;
                 }
                 TokenKind::Whitespace
             }
@@ -93,10 +101,13 @@ impl<'src> Lexer<'src> {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semicolon,
-            _ => TokenKind::Unknown,
+            c => TokenKind::Unknown {
+                ch: c,
+                line: self.cursor.cur_line,
+            },
         };
 
-        Token::new(token_kind, 0)
+        Token::new(token_kind, len)
     }
 }
 
@@ -229,5 +240,19 @@ mod tests {
                 .next()
                 .is_some_and(|v| matches!(v.kind, TokenKind::RightParen))
         );
+    }
+
+    #[test]
+    fn returns_unknown_token_kind_for_unexpected_token() {
+        let mut lexer = Lexer::new("$");
+        let ch = lexer.next().unwrap();
+        assert!(matches!(ch.kind, TokenKind::Unknown { .. }));
+    }
+
+    #[test]
+    fn returns_unknown_token_line() {
+        let mut lexer = Lexer::new("$");
+        let ch = lexer.next().unwrap();
+        assert!(matches!(ch.kind, TokenKind::Unknown { line: 1, .. }));
     }
 }

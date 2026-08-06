@@ -26,12 +26,20 @@ fn main() {
             });
 
             let lexer = Lexer::new(&file_contents);
+            let mut is_valid = true;
             for token in lexer {
-                if let Some(s) = format_token(token) {
+                if let Some(s) = format_token(&token) {
                     println!("{s}");
+                }
+                if matches!(token.kind, TokenKind::Unknown { .. }) {
+                    is_valid = false;
                 }
             }
             println!("EOF  null");
+
+            if !is_valid {
+                std::process::exit(65)
+            }
         }
         _ => {
             eprintln!("Unknown command: {}", command);
@@ -39,7 +47,7 @@ fn main() {
     }
 }
 
-fn format_token(t: Token) -> Option<&'static str> {
+fn format_token(t: &Token) -> Option<&'static str> {
     match t.kind {
         TokenKind::LeftParen => Some("LEFT_PAREN ( null"),
         TokenKind::RightParen => Some("RIGHT_PAREN ) null"),
@@ -51,6 +59,7 @@ fn format_token(t: Token) -> Option<&'static str> {
         TokenKind::Plus => Some("PLUS + null"),
         TokenKind::Semicolon => Some("SEMICOLON ; null"),
         TokenKind::Star => Some("STAR * null"),
-        TokenKind::Whitespace | TokenKind::Unknown | TokenKind::Eof => None,
+        TokenKind::Unknown { ch, line } => Some("[line {line}] Unexpected character: $"),
+        TokenKind::Whitespace | TokenKind::Eof => None,
     }
 }
