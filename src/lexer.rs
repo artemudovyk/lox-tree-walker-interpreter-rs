@@ -1,4 +1,4 @@
-use std::{fmt::Display, iter::Peekable, str::Chars};
+use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
@@ -12,6 +12,8 @@ pub enum TokenKind {
     Plus,
     Semicolon,
     Star,
+    Equal,
+    EqualEqual,
     Whitespace,
     Unknown { ch: char, line: usize },
     Eof,
@@ -101,6 +103,13 @@ impl<'src> Lexer<'src> {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semicolon,
+            '=' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.bump();
+                    TokenKind::EqualEqual
+                }
+                _ => TokenKind::Equal,
+            },
             c => TokenKind::Unknown {
                 ch: c,
                 line: self.cursor.cur_line,
@@ -254,5 +263,25 @@ mod tests {
         let mut lexer = Lexer::new("$");
         let ch = lexer.next().unwrap();
         assert!(matches!(ch.kind, TokenKind::Unknown { line: 1, .. }));
+    }
+
+    #[test]
+    fn equal() {
+        let mut lexer = Lexer::new("=");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Equal))
+        );
+    }
+
+    #[test]
+    fn equal_equal() {
+        let mut lexer = Lexer::new("==");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::EqualEqual))
+        );
     }
 }

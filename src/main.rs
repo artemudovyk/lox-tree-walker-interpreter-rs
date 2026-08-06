@@ -58,6 +58,8 @@ fn print_token(t: &Token) {
         TokenKind::Plus => println!("PLUS + null"),
         TokenKind::Semicolon => println!("SEMICOLON ; null"),
         TokenKind::Star => println!("STAR * null"),
+        TokenKind::Equal => println!("EQUAL = null"),
+        TokenKind::EqualEqual => println!("EQUAL_EQUAL == null"),
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }
