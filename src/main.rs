@@ -1,9 +1,9 @@
 #![allow(unused_variables)]
+use codecrafters_interpreter::lexer::Lexer;
+use codecrafters_interpreter::lexer::Token;
+use codecrafters_interpreter::lexer::TokenKind;
 use std::env;
 use std::fs;
-
-use codecrafters_interpreter::lexer::Lexer;
-use codecrafters_interpreter::lexer::TokenKind;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -25,23 +25,32 @@ fn main() {
                 String::new()
             });
 
-            let mut lexer = Lexer::new(&file_contents);
-            loop {
-                let token = lexer.next_token();
-
-                if matches!(token.kind, TokenKind::Whitespace) {
-                    continue;
-                }
-
-                println!("{token}");
-
-                if matches!(token.kind, TokenKind::Eof) {
-                    break;
+            let lexer = Lexer::new(&file_contents);
+            for token in lexer {
+                if let Some(s) = format_token(token) {
+                    println!("{s}");
                 }
             }
+            println!("EOF  null");
         }
         _ => {
             eprintln!("Unknown command: {}", command);
         }
+    }
+}
+
+fn format_token(t: Token) -> Option<&'static str> {
+    match t.kind {
+        TokenKind::LeftParen => Some("LEFT_PAREN ( null"),
+        TokenKind::RightParen => Some("RIGHT_PAREN ) null"),
+        TokenKind::LeftBrace => Some("LEFT_BRACE { null"),
+        TokenKind::RightBrace => Some("RIGHT_BRACE } null"),
+        TokenKind::Comma => Some("COMMA , null"),
+        TokenKind::Dot => Some("DOT . null"),
+        TokenKind::Minus => Some("MINUS - null"),
+        TokenKind::Plus => Some("PLUS + null"),
+        TokenKind::Semicolon => Some("SEMICOLON ; null"),
+        TokenKind::Star => Some("STAR * null"),
+        TokenKind::Whitespace | TokenKind::Unknown | TokenKind::Eof => None,
     }
 }

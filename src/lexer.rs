@@ -1,29 +1,19 @@
-use std::{fmt::Display, str::Chars};
+use std::{fmt::Display, iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind {
-    /// `(`
     LeftParen,
-    /// `)`
     RightParen,
-    /// `{`
     LeftBrace,
-    /// `}`
     RightBrace,
-    /// `,`
     Comma,
-    /// `.`
     Dot,
-    /// `-`
     Minus,
-    /// `+`
     Plus,
-    /// `;`
     Semicolon,
-    /// `*`
     Star,
-    /// Any whitespace char
     Whitespace,
+    Unknown,
     Eof,
 }
 
@@ -36,41 +26,34 @@ impl Token {
     fn new(kind: TokenKind, len: usize) -> Self {
         Self { kind, len }
     }
-}
 
-impl Display for Token {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.kind {
-            TokenKind::LeftParen => f.write_str("LEFT_PAREN ( null"),
-            TokenKind::RightParen => f.write_str("RIGHT_PAREN ) null"),
-            TokenKind::LeftBrace => f.write_str("LEFT_BRACE { null"),
-            TokenKind::RightBrace => f.write_str("RIGHT_BRACE } null"),
-            TokenKind::Comma => f.write_str("COMMA , null"),
-            TokenKind::Dot => f.write_str("DOT . null"),
-            TokenKind::Minus => f.write_str("MINUS - null"),
-            TokenKind::Plus => f.write_str("PLUS + null"),
-            TokenKind::Semicolon => f.write_str("SEMICOLON ; null"),
-            TokenKind::Star => f.write_str("STAR * null"),
-            // TODO: remove?
-            TokenKind::Whitespace => f.write_str("WHITESPACE  null"),
-            TokenKind::Eof => f.write_str("EOF  null"),
+    fn eof() -> Self {
+        Self {
+            kind: TokenKind::Eof,
+            len: 0,
         }
     }
 }
 
 struct Cursor<'a> {
     /// Iterator over src chars
-    chars: Chars<'a>,
+    chars: Peekable<Chars<'a>>,
 }
 
 impl<'a> Cursor<'a> {
     fn new(chars: Chars<'a>) -> Self {
-        Self { chars }
+        Self {
+            chars: chars.peekable(),
+        }
     }
 
     /// Returns next char and moves the cursor
     fn bump(&mut self) -> Option<char> {
         self.chars.next()
+    }
+
+    fn peek(&mut self) -> Option<&char> {
+        self.chars.peek()
     }
 }
 
@@ -89,13 +72,17 @@ impl<'src> Lexer<'src> {
     }
 
     pub fn next_token(&mut self) -> Token {
-        let Some(char) = self.cursor.bump() else {
-            return Token::new(TokenKind::Eof, 0);
+        let Some(ch) = self.cursor.bump() else {
+            return Token::eof();
         };
 
-        dbg!(&char);
-
-        let token_kind = match char {
+        let token_kind = match ch {
+            c if c.is_whitespace() => {
+                while self.cursor.peek().is_some_and(|v| v.is_whitespace()) {
+                    self.cursor.bump();
+                }
+                TokenKind::Whitespace
+            }
             '(' => TokenKind::LeftParen,
             ')' => TokenKind::RightParen,
             '{' => TokenKind::LeftBrace,
@@ -106,11 +93,22 @@ impl<'src> Lexer<'src> {
             '+' => TokenKind::Plus,
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semicolon,
-            '\n' => TokenKind::Whitespace,
-            _ => TokenKind::Eof,
+            _ => TokenKind::Unknown,
         };
 
         Token::new(token_kind, 0)
+    }
+}
+
+impl<'src> Iterator for Lexer<'src> {
+    type Item = Token;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let token = self.next_token();
+        match token.kind {
+            TokenKind::Eof => None,
+            _ => Some(token),
+        }
     }
 }
 
@@ -119,79 +117,117 @@ mod tests {
     use super::*;
 
     #[test]
-    fn lex_left_paren() {
-        let mut lexer = Lexer::new("(");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::LeftParen);
+    fn parens() {
+        let mut lexer = Lexer::new("()");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::LeftParen))
+        );
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::RightParen))
+        );
     }
 
     #[test]
-    fn lex_right_paren() {
-        let mut lexer = Lexer::new(")");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::RightParen);
+    fn braces() {
+        let mut lexer = Lexer::new("{}");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::LeftBrace))
+        );
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::RightBrace))
+        );
     }
 
     #[test]
-    fn lex_left_brace() {
-        let mut lexer = Lexer::new("{");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::LeftBrace);
-    }
-
-    #[test]
-    fn lex_right_brace() {
-        let mut lexer = Lexer::new("}");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::RightBrace);
-    }
-
-    #[test]
-    fn lex_comma() {
+    fn comma() {
         let mut lexer = Lexer::new(",");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Comma);
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Comma))
+        );
     }
 
     #[test]
-    fn lex_dot() {
+    fn dot() {
         let mut lexer = Lexer::new(".");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Dot);
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Dot))
+        );
     }
 
     #[test]
-    fn lex_dash() {
+    fn minus() {
         let mut lexer = Lexer::new("-");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Minus);
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Minus))
+        );
     }
 
     #[test]
-    fn lex_plus() {
+    fn plus() {
         let mut lexer = Lexer::new("+");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Plus);
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Plus))
+        );
     }
 
     #[test]
-    fn lex_semicolon() {
-        let mut lexer = Lexer::new(";");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Semicolon);
-    }
-
-    #[test]
-    fn lex_star() {
+    fn star() {
         let mut lexer = Lexer::new("*");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Star);
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Star))
+        );
     }
 
     #[test]
-    fn empty_string_produces_eof_token() {
-        let mut lexer = Lexer::new("");
-        let token = lexer.next_token();
-        assert_eq!(token.kind, TokenKind::Eof);
+    fn semicolon() {
+        let mut lexer = Lexer::new(";");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Semicolon))
+        );
+    }
+
+    #[test]
+    fn iterates_over_all_tokens() {
+        let mut lexer = Lexer::new("({})");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::LeftParen))
+        );
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::LeftBrace))
+        );
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::RightBrace))
+        );
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::RightParen))
+        );
     }
 }
