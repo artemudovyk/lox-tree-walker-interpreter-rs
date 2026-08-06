@@ -59,7 +59,9 @@ fn format_token(t: &Token) -> Option<String> {
         TokenKind::Plus => Some("PLUS + null".to_string()),
         TokenKind::Semicolon => Some("SEMICOLON ; null".to_string()),
         TokenKind::Star => Some("STAR * null".to_string()),
-        TokenKind::Unknown { ch, line } => Some(format!("[line {line}] Unexpected character: $")),
+        TokenKind::Unknown { ch, line } => {
+            Some(format!("[line {line}] Unexpected character: {ch}"))
+        }
         TokenKind::Whitespace | TokenKind::Eof => None,
     }
 }
