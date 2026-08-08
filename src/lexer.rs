@@ -20,6 +20,8 @@ pub enum TokenKind {
     LessEqual,
     Greater,
     GreaterEqual,
+    Division,
+    Comment,
     Whitespace,
     Unknown { ch: char, line: usize },
     Eof,
@@ -49,6 +51,8 @@ struct Cursor<'a> {
     cur_line: usize,
 }
 
+const EOF_CHAR: char = '\0';
+
 impl<'a> Cursor<'a> {
     fn new(chars: Chars<'a>) -> Self {
         Self {
@@ -66,8 +70,14 @@ impl<'a> Cursor<'a> {
         ch
     }
 
-    fn peek(&mut self) -> Option<&char> {
-        self.chars.peek()
+    fn peek(&mut self) -> char {
+        self.chars.peek().copied().unwrap_or(EOF_CHAR)
+    }
+
+    fn eat_until(&mut self, mut predicate: impl FnMut(char) -> bool) {
+        while predicate(self.peek()) {
+            self.bump();
+        }
     }
 }
 
@@ -93,7 +103,7 @@ impl<'src> Lexer<'src> {
         let mut len = 1;
         let token_kind = match ch {
             c if c.is_whitespace() => {
-                while self.cursor.peek().is_some_and(|v| v.is_whitespace()) {
+                while self.cursor.peek().is_whitespace() {
                     self.cursor.bump();
                     len += 1;
                 }
@@ -110,32 +120,39 @@ impl<'src> Lexer<'src> {
             '-' => TokenKind::Minus,
             ';' => TokenKind::Semicolon,
             '=' => match self.cursor.peek() {
-                Some('=') => {
+                '=' => {
                     self.cursor.bump();
                     TokenKind::EqualEqual
                 }
                 _ => TokenKind::Equal,
             },
             '!' => match self.cursor.peek() {
-                Some('=') => {
+                '=' => {
                     self.cursor.bump();
                     TokenKind::BangEqual
                 }
                 _ => TokenKind::Bang,
             },
             '<' => match self.cursor.peek() {
-                Some('=') => {
+                '=' => {
                     self.cursor.bump();
                     TokenKind::LessEqual
                 }
                 _ => TokenKind::Less,
             },
             '>' => match self.cursor.peek() {
-                Some('=') => {
+                '=' => {
                     self.cursor.bump();
                     TokenKind::GreaterEqual
                 }
                 _ => TokenKind::Greater,
+            },
+            '/' => match self.cursor.peek() {
+                '/' => {
+                    self.cursor.eat_until(|v| v == '\n');
+                    TokenKind::Comment
+                }
+                _ => TokenKind::Division,
             },
             c => TokenKind::Unknown {
                 ch: c,
@@ -369,6 +386,26 @@ mod tests {
             lexer
                 .next()
                 .is_some_and(|v| matches!(v.kind, TokenKind::GreaterEqual))
+        );
+    }
+
+    #[test]
+    fn division() {
+        let mut lexer = Lexer::new("/");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Division))
+        );
+    }
+
+    #[test]
+    fn comment() {
+        let mut lexer = Lexer::new("// abc");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Comment))
         );
     }
 }

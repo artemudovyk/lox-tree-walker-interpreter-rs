@@ -66,9 +66,10 @@ fn print_token(t: &Token) {
         TokenKind::LessEqual => println!("LESS_EQUAL <= null"),
         TokenKind::Greater => println!("GREATER > null"),
         TokenKind::GreaterEqual => println!("GREATER_EQUAL >= null"),
+        TokenKind::Division => println!("DIVISION / null"),
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }
-        TokenKind::Whitespace | TokenKind::Eof => {}
+        TokenKind::Whitespace | TokenKind::Comment | TokenKind::Eof => {}
     }
 }
