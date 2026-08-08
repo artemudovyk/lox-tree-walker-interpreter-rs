@@ -16,6 +16,10 @@ pub enum TokenKind {
     EqualEqual,
     Bang,
     BangEqual,
+    Less,
+    LessEqual,
+    Greater,
+    GreaterEqual,
     Whitespace,
     Unknown { ch: char, line: usize },
     Eof,
@@ -118,6 +122,20 @@ impl<'src> Lexer<'src> {
                     TokenKind::BangEqual
                 }
                 _ => TokenKind::Bang,
+            },
+            '<' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.bump();
+                    TokenKind::LessEqual
+                }
+                _ => TokenKind::Less,
+            },
+            '>' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.bump();
+                    TokenKind::GreaterEqual
+                }
+                _ => TokenKind::Greater,
             },
             c => TokenKind::Unknown {
                 ch: c,
@@ -311,6 +329,46 @@ mod tests {
             lexer
                 .next()
                 .is_some_and(|v| matches!(v.kind, TokenKind::BangEqual))
+        );
+    }
+
+    #[test]
+    fn less() {
+        let mut lexer = Lexer::new("<");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Less))
+        );
+    }
+
+    #[test]
+    fn less_equal() {
+        let mut lexer = Lexer::new("<=");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::LessEqual))
+        );
+    }
+
+    #[test]
+    fn greater() {
+        let mut lexer = Lexer::new(">");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Greater))
+        );
+    }
+
+    #[test]
+    fn greater_equal() {
+        let mut lexer = Lexer::new(">=");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::GreaterEqual))
         );
     }
 }
