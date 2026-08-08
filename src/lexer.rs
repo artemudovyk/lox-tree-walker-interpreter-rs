@@ -20,7 +20,7 @@ pub enum TokenKind {
     LessEqual,
     Greater,
     GreaterEqual,
-    Division,
+    Slash,
     Comment,
     Whitespace,
     Unknown { ch: char, line: usize },
@@ -152,7 +152,7 @@ impl<'src> Lexer<'src> {
                     self.cursor.eat_while(|v| v != '\n' && v != EOF_CHAR);
                     TokenKind::Comment
                 }
-                _ => TokenKind::Division,
+                _ => TokenKind::Slash,
             },
             c => TokenKind::Unknown {
                 ch: c,
@@ -390,12 +390,12 @@ mod tests {
     }
 
     #[test]
-    fn division() {
+    fn slash() {
         let mut lexer = Lexer::new("/");
         assert!(
             lexer
                 .next()
-                .is_some_and(|v| matches!(v.kind, TokenKind::Division))
+                .is_some_and(|v| matches!(v.kind, TokenKind::Slash))
         );
     }
 
