@@ -14,6 +14,8 @@ pub enum TokenKind {
     Star,
     Equal,
     EqualEqual,
+    Bang,
+    BangEqual,
     Whitespace,
     Unknown { ch: char, line: usize },
     Eof,
@@ -109,6 +111,13 @@ impl<'src> Lexer<'src> {
                     TokenKind::EqualEqual
                 }
                 _ => TokenKind::Equal,
+            },
+            '!' => match self.cursor.peek() {
+                Some('=') => {
+                    self.cursor.bump();
+                    TokenKind::BangEqual
+                }
+                _ => TokenKind::Bang,
             },
             c => TokenKind::Unknown {
                 ch: c,
@@ -282,6 +291,26 @@ mod tests {
             lexer
                 .next()
                 .is_some_and(|v| matches!(v.kind, TokenKind::EqualEqual))
+        );
+    }
+
+    #[test]
+    fn bang() {
+        let mut lexer = Lexer::new("!");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::Bang))
+        );
+    }
+
+    #[test]
+    fn bang_equal() {
+        let mut lexer = Lexer::new("!=");
+        assert!(
+            lexer
+                .next()
+                .is_some_and(|v| matches!(v.kind, TokenKind::BangEqual))
         );
     }
 }
