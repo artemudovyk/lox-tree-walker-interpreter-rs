@@ -74,7 +74,7 @@ impl<'a> Cursor<'a> {
         self.chars.peek().copied().unwrap_or(EOF_CHAR)
     }
 
-    fn eat_until(&mut self, mut predicate: impl FnMut(char) -> bool) {
+    fn eat_while(&mut self, mut predicate: impl FnMut(char) -> bool) {
         while predicate(self.peek()) {
             self.bump();
         }
@@ -149,7 +149,7 @@ impl<'src> Lexer<'src> {
             },
             '/' => match self.cursor.peek() {
                 '/' => {
-                    self.cursor.eat_until(|v| v == '\n');
+                    self.cursor.eat_while(|v| v != '\n' && v != EOF_CHAR);
                     TokenKind::Comment
                 }
                 _ => TokenKind::Division,
@@ -401,7 +401,7 @@ mod tests {
 
     #[test]
     fn comment() {
-        let mut lexer = Lexer::new("// abc");
+        let mut lexer = Lexer::new("// comment");
         assert!(
             lexer
                 .next()
