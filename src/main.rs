@@ -1,5 +1,6 @@
 #![allow(unused_variables)]
 use codecrafters_interpreter::lexer::Lexer;
+use codecrafters_interpreter::lexer::Literal;
 use codecrafters_interpreter::lexer::Token;
 use codecrafters_interpreter::lexer::TokenKind;
 use std::env;
@@ -47,7 +48,7 @@ fn main() {
 }
 
 fn print_token(t: &Token) {
-    match t.kind {
+    match &t.kind {
         TokenKind::LeftParen => println!("LEFT_PAREN ( null"),
         TokenKind::RightParen => println!("RIGHT_PAREN ) null"),
         TokenKind::LeftBrace => println!("LEFT_BRACE {{ null"),
@@ -67,7 +68,14 @@ fn print_token(t: &Token) {
         TokenKind::Greater => println!("GREATER > null"),
         TokenKind::GreaterEqual => println!("GREATER_EQUAL >= null"),
         TokenKind::Slash => println!("SLASH / null"),
-        TokenKind::String => println!("STRING {} {}", t.lexeme, t.lexeme),
+        TokenKind::String => println!(
+            "STRING {} {}",
+            t.lexeme,
+            t.lexeme.trim_matches(|v| v == '"')
+        ),
+        TokenKind::Literal(lit) => match lit {
+            Literal::String(s) => println!("STRING {} {}", t.lexeme, s),
+        },
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }

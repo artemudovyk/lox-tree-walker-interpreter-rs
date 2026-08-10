@@ -1,7 +1,7 @@
 use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TokenKind {
+pub enum TokenKind<'src> {
     LeftParen,
     RightParen,
     LeftBrace,
@@ -22,21 +22,26 @@ pub enum TokenKind {
     GreaterEqual,
     Slash,
     Comment,
-    String,
     Whitespace,
+    Literal(Literal<'src>),
     Unknown { ch: char, line: usize },
     Eof,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Literal<'src> {
+    String(&'src str),
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct Token<'src> {
-    pub kind: TokenKind,
+    pub kind: TokenKind<'src>,
     pub lexeme: &'src str,
     pub len: usize,
 }
 
 impl<'src> Token<'src> {
-    fn new(kind: TokenKind, lexeme: &'src str, len: usize) -> Self {
+    fn new(kind: TokenKind<'src>, lexeme: &'src str, len: usize) -> Self {
         Self { kind, lexeme, len }
     }
 
@@ -164,7 +169,7 @@ impl<'src> Lexer<'src> {
             '"' => {
                 self.cursor.eat_while(|v| v != '"');
                 self.cursor.bump();
-                TokenKind::String
+                TokenKind::Literal(Literal::String(&self.src[pos + 1..self.cursor.pos - 1]))
             }
             c => TokenKind::Unknown {
                 ch: c,
@@ -437,7 +442,7 @@ mod tests {
         assert_eq!(
             tokens,
             vec![Token {
-                kind: TokenKind::String,
+                kind: TokenKind::Literal(Literal::String("this is a test string")),
                 lexeme: "\"this is a test string\"",
                 len: 25,
             }]
