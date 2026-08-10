@@ -31,7 +31,7 @@ fn main() {
             for token in lexer {
                 print_token(&token);
 
-                if matches!(token.kind, TokenKind::Unknown { .. }) {
+                if matches!(token.kind, TokenKind::Unknown { .. }) || token.unterminated() {
                     is_valid = false;
                 }
             }

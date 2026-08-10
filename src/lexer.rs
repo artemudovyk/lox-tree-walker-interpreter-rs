@@ -83,6 +83,15 @@ impl<'src> Token<'src> {
             line,
         }
     }
+
+    pub fn unterminated(&self) -> bool {
+        match &self.kind {
+            TokenKind::Literal(literal) => match literal {
+                Literal::String { terminated, .. } => !terminated,
+            },
+            _ => false,
+        }
+    }
 }
 
 struct Cursor<'a> {
