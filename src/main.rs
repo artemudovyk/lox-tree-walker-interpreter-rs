@@ -68,11 +68,6 @@ fn print_token(t: &Token) {
         TokenKind::Greater => println!("GREATER > null"),
         TokenKind::GreaterEqual => println!("GREATER_EQUAL >= null"),
         TokenKind::Slash => println!("SLASH / null"),
-        TokenKind::String => println!(
-            "STRING {} {}",
-            t.lexeme,
-            t.lexeme.trim_matches(|v| v == '"')
-        ),
         TokenKind::Literal(lit) => match lit {
             Literal::String(s) => println!("STRING {} {}", t.lexeme, s),
         },
