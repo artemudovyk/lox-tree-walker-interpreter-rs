@@ -99,8 +99,7 @@ struct Cursor<'a> {
     chars: Peekable<Chars<'a>>,
     /// Current line
     line: usize,
-    /// Consumed chars
-    pos: usize,
+    byte_pos: usize,
 }
 
 const EOF_CHAR: char = '\0';
@@ -110,18 +109,18 @@ impl<'a> Cursor<'a> {
         Self {
             chars: chars.peekable(),
             line: 1,
-            pos: 0,
+            byte_pos: 0,
         }
     }
 
     /// Returns next char and moves the cursor
     fn bump(&mut self) -> Option<char> {
-        let ch = self.chars.next();
-        if ch == Some('\n') {
+        let ch = self.chars.next()?;
+        if ch == '\n' {
             self.line += 1;
         }
-        self.pos += 1;
-        ch
+        self.byte_pos += ch.len_utf8();
+        Some(ch)
     }
 
     fn peek(&mut self) -> char {
@@ -149,7 +148,7 @@ impl<'src> Lexer<'src> {
     }
 
     pub fn next_token(&mut self) -> Token<'src> {
-        let pos = self.cursor.pos;
+        let start = self.cursor.byte_pos;
         let Some(ch) = self.cursor.bump() else {
             return Token::eof(self.cursor.line);
         };
@@ -217,7 +216,7 @@ impl<'src> Lexer<'src> {
                 } else {
                     self.cursor.bump();
                     TokenKind::Literal(Literal::String {
-                        s: &self.src[pos + 1..self.cursor.pos - 1],
+                        s: &self.src[start..self.cursor.byte_pos].trim_matches(|v| v == '"'),
                         terminated: true,
                     })
                 }
@@ -228,13 +227,8 @@ impl<'src> Lexer<'src> {
             },
         };
 
-        Token::new(
-            token_kind,
-            // TODO: will probably fail if there are chars that take more than 1 byte
-            &self.src[pos..self.cursor.pos],
-            self.cursor.pos - pos + 2,
-            self.cursor.line,
-        )
+        let lexeme = &self.src[start..self.cursor.byte_pos];
+        Token::new(token_kind, lexeme, lexeme.chars().count(), self.cursor.line)
     }
 
     pub fn tokenize(&mut self) -> Vec<Token<'src>> {
@@ -499,7 +493,7 @@ mod tests {
                     terminated: true
                 }),
                 lexeme: "\"this is a test string\"",
-                len: 25,
+                len: 23,
                 line: 1,
             }]
         )
@@ -517,7 +511,7 @@ mod tests {
                     terminated: false
                 }),
                 lexeme: "\"this is an unterminated string",
-                len: 33,
+                len: 31,
                 line: 1,
             }]
         )
