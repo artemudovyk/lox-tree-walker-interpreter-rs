@@ -69,7 +69,13 @@ fn print_token(t: &Token) {
         TokenKind::GreaterEqual => println!("GREATER_EQUAL >= null"),
         TokenKind::Slash => println!("SLASH / null"),
         TokenKind::Literal(lit) => match lit {
-            Literal::String(s) => println!("STRING {} {}", t.lexeme, s),
+            Literal::String { s, terminated } => {
+                if *terminated {
+                    println!("STRING {} {}", t.lexeme, s)
+                } else {
+                    eprintln!("[line {}] Error: Unterminated string.", t.line)
+                }
+            }
         },
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")

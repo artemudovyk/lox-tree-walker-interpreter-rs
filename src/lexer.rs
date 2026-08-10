@@ -2,35 +2,59 @@ use std::{iter::Peekable, str::Chars};
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind<'src> {
+    /// `(`
     LeftParen,
+    /// `)`
     RightParen,
+    /// `{`
     LeftBrace,
+    /// `}`
     RightBrace,
+    /// `,`
     Comma,
+    /// `.`
     Dot,
+    /// `-`
     Minus,
+    /// `+`
     Plus,
+    /// `;`
     Semicolon,
+    /// `*`
     Star,
+    /// `=`
     Equal,
+    /// `==`
     EqualEqual,
+    /// `!`
     Bang,
+    /// `!=`
     BangEqual,
+    /// `<`
     Less,
+    /// `<=`
     LessEqual,
+    /// `>`
     Greater,
+    /// `>=`
     GreaterEqual,
+    /// `/`
     Slash,
+    /// `// comment`
     Comment,
+    /// Any whitespace char
     Whitespace,
     Literal(Literal<'src>),
-    Unknown { ch: char, line: usize },
+    Unknown {
+        ch: char,
+        line: usize,
+    },
     Eof,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Literal<'src> {
-    String(&'src str),
+    String { s: &'src str, terminated: bool },
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -38,18 +62,25 @@ pub struct Token<'src> {
     pub kind: TokenKind<'src>,
     pub lexeme: &'src str,
     pub len: usize,
+    pub line: usize,
 }
 
 impl<'src> Token<'src> {
-    fn new(kind: TokenKind<'src>, lexeme: &'src str, len: usize) -> Self {
-        Self { kind, lexeme, len }
+    fn new(kind: TokenKind<'src>, lexeme: &'src str, len: usize, line: usize) -> Self {
+        Self {
+            kind,
+            lexeme,
+            len,
+            line,
+        }
     }
 
-    fn eof() -> Self {
+    fn eof(line: usize) -> Self {
         Self {
             kind: TokenKind::Eof,
             lexeme: "",
             len: 0,
+            line,
         }
     }
 }
@@ -111,7 +142,7 @@ impl<'src> Lexer<'src> {
     pub fn next_token(&mut self) -> Token<'src> {
         let pos = self.cursor.pos;
         let Some(ch) = self.cursor.bump() else {
-            return Token::eof();
+            return Token::eof(self.cursor.line);
         };
 
         let token_kind = match ch {
@@ -167,9 +198,20 @@ impl<'src> Lexer<'src> {
                 _ => TokenKind::Slash,
             },
             '"' => {
-                self.cursor.eat_while(|v| v != '"');
-                self.cursor.bump();
-                TokenKind::Literal(Literal::String(&self.src[pos + 1..self.cursor.pos - 1]))
+                self.cursor
+                    .eat_while(|v| v != '"' && v != '\n' && v != EOF_CHAR);
+                if self.cursor.peek() == EOF_CHAR || self.cursor.peek() == '\n' {
+                    TokenKind::Literal(Literal::String {
+                        s: "",
+                        terminated: false,
+                    })
+                } else {
+                    self.cursor.bump();
+                    TokenKind::Literal(Literal::String {
+                        s: &self.src[pos + 1..self.cursor.pos - 1],
+                        terminated: true,
+                    })
+                }
             }
             c => TokenKind::Unknown {
                 ch: c,
@@ -182,6 +224,7 @@ impl<'src> Lexer<'src> {
             // TODO: will probably fail if there are chars that take more than 1 byte
             &self.src[pos..self.cursor.pos],
             self.cursor.pos - pos + 2,
+            self.cursor.line,
         )
     }
 
@@ -442,9 +485,31 @@ mod tests {
         assert_eq!(
             tokens,
             vec![Token {
-                kind: TokenKind::Literal(Literal::String("this is a test string")),
+                kind: TokenKind::Literal(Literal::String {
+                    s: "this is a test string",
+                    terminated: true
+                }),
                 lexeme: "\"this is a test string\"",
                 len: 25,
+                line: 1,
+            }]
+        )
+    }
+
+    #[test]
+    fn unterminaed_string() {
+        let mut lexer = Lexer::new(r#""this is an unterminated string"#);
+        let tokens = lexer.tokenize();
+        assert_eq!(
+            tokens,
+            vec![Token {
+                kind: TokenKind::Literal(Literal::String {
+                    s: "",
+                    terminated: false
+                }),
+                lexeme: "\"this is an unterminated string",
+                len: 33,
+                line: 1,
             }]
         )
     }
