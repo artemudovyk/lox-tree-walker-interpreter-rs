@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     LeftParen,
     RightParen,
@@ -22,24 +22,28 @@ pub enum TokenKind {
     GreaterEqual,
     Slash,
     Comment,
+    String,
     Whitespace,
     Unknown { ch: char, line: usize },
     Eof,
 }
 
-pub struct Token {
+#[derive(Debug, PartialEq, Eq)]
+pub struct Token<'src> {
     pub kind: TokenKind,
+    pub lexeme: &'src str,
     pub len: usize,
 }
 
-impl Token {
-    fn new(kind: TokenKind, len: usize) -> Self {
-        Self { kind, len }
+impl<'src> Token<'src> {
+    fn new(kind: TokenKind, lexeme: &'src str, len: usize) -> Self {
+        Self { kind, lexeme, len }
     }
 
     fn eof() -> Self {
         Self {
             kind: TokenKind::Eof,
+            lexeme: "",
             len: 0,
         }
     }
@@ -48,7 +52,10 @@ impl Token {
 struct Cursor<'a> {
     /// Iterator over src chars
     chars: Peekable<Chars<'a>>,
-    cur_line: usize,
+    /// Current line
+    line: usize,
+    /// Consumed chars
+    pos: usize,
 }
 
 const EOF_CHAR: char = '\0';
@@ -57,7 +64,8 @@ impl<'a> Cursor<'a> {
     fn new(chars: Chars<'a>) -> Self {
         Self {
             chars: chars.peekable(),
-            cur_line: 1,
+            line: 1,
+            pos: 0,
         }
     }
 
@@ -65,8 +73,9 @@ impl<'a> Cursor<'a> {
     fn bump(&mut self) -> Option<char> {
         let ch = self.chars.next();
         if ch == Some('\n') {
-            self.cur_line += 1;
+            self.line += 1;
         }
+        self.pos += 1;
         ch
     }
 
@@ -82,7 +91,6 @@ impl<'a> Cursor<'a> {
 }
 
 pub struct Lexer<'src> {
-    #[allow(dead_code)]
     src: &'src str,
     cursor: Cursor<'src>,
 }
@@ -95,17 +103,16 @@ impl<'src> Lexer<'src> {
         }
     }
 
-    pub fn next_token(&mut self) -> Token {
+    pub fn next_token(&mut self) -> Token<'src> {
+        let pos = self.cursor.pos;
         let Some(ch) = self.cursor.bump() else {
             return Token::eof();
         };
 
-        let mut len = 1;
         let token_kind = match ch {
             c if c.is_whitespace() => {
                 while self.cursor.peek().is_whitespace() {
                     self.cursor.bump();
-                    len += 1;
                 }
                 TokenKind::Whitespace
             }
@@ -154,18 +161,32 @@ impl<'src> Lexer<'src> {
                 }
                 _ => TokenKind::Slash,
             },
+            '"' => {
+                self.cursor.eat_while(|v| v != '"');
+                self.cursor.bump();
+                TokenKind::String
+            }
             c => TokenKind::Unknown {
                 ch: c,
-                line: self.cursor.cur_line,
+                line: self.cursor.line,
             },
         };
 
-        Token::new(token_kind, len)
+        Token::new(
+            token_kind,
+            // TODO: will probably fail if there are chars that take more than 1 byte
+            &self.src[pos..self.cursor.pos],
+            self.cursor.pos - pos + 2,
+        )
+    }
+
+    pub fn tokenize(&mut self) -> Vec<Token<'src>> {
+        self.by_ref().collect()
     }
 }
 
 impl<'src> Iterator for Lexer<'src> {
-    type Item = Token;
+    type Item = Token<'src>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let token = self.next_token();
@@ -407,5 +428,19 @@ mod tests {
                 .next()
                 .is_some_and(|v| matches!(v.kind, TokenKind::Comment))
         );
+    }
+
+    #[test]
+    fn string() {
+        let mut lexer = Lexer::new(r#""this is a test string""#);
+        let tokens = lexer.tokenize();
+        assert_eq!(
+            tokens,
+            vec![Token {
+                kind: TokenKind::String,
+                lexeme: "\"this is a test string\"",
+                len: 25,
+            }]
+        )
     }
 }

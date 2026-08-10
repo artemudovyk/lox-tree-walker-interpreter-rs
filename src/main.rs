@@ -67,6 +67,7 @@ fn print_token(t: &Token) {
         TokenKind::Greater => println!("GREATER > null"),
         TokenKind::GreaterEqual => println!("GREATER_EQUAL >= null"),
         TokenKind::Slash => println!("SLASH / null"),
+        TokenKind::String => println!("STRING {} {}", t.lexeme, t.lexeme),
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }
