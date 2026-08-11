@@ -76,7 +76,13 @@ fn print_token(t: &Token) {
                     eprintln!("[line {}] Error: Unterminated string.", t.line)
                 }
             }
-            Literal::Number { v } => println!("NUMBER {} {:.1}", t.lexeme, v),
+            Literal::Number { v } => {
+                if *v == v.trunc() {
+                    println!("NUMBER {} {:.1}", t.lexeme, v)
+                } else {
+                    println!("NUMBER {} {}", t.lexeme, v)
+                }
+            }
         },
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
