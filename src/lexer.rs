@@ -223,7 +223,7 @@ impl<'src> Lexer<'src> {
                     })
                 }
             }
-            '1'..'9' => {
+            '1'..='9' => {
                 self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
                 if self.cursor.peek() == '.' {}
                 let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
@@ -537,6 +537,21 @@ mod tests {
                 vec![Token {
                     kind: TokenKind::Literal(Literal::Number { v: 1234.0 }),
                     lexeme: "1234",
+                    len: 4,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn integer_starts_with_9() {
+            let mut lexer = Lexer::new("9123");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Literal(Literal::Number { v: 9123.0 }),
+                    lexeme: "9123",
                     len: 4,
                     line: 1,
                 }]
