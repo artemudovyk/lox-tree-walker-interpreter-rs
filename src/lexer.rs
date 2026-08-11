@@ -251,10 +251,10 @@ impl<'src> Lexer<'src> {
                 let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
                 TokenKind::Literal(Literal::Number { v })
             }
-            'a'..='z' | '_' => {
+            'a'..='z' | 'A'..='Z' | '_' => {
                 self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
                 let v = &self.src[start..self.cursor.byte_pos];
-                match v {
+                match v.to_lowercase().as_ref() {
                     "var" => TokenKind::Keyword(Keyword::Var),
                     "fun" => TokenKind::Keyword(Keyword::Fun),
                     "return" => TokenKind::Keyword(Keyword::Return),
@@ -880,6 +880,21 @@ mod tests {
                     kind: TokenKind::Keyword(Keyword::Print),
                     lexeme: "print",
                     len: 5,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn uppercase_keyword() {
+            let mut lexer = Lexer::new("AND");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::And),
+                    lexeme: "AND",
+                    len: 3,
                     line: 1,
                 }]
             )
