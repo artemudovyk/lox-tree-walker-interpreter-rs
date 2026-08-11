@@ -246,7 +246,7 @@ impl<'src> Lexer<'src> {
                     })
                 }
             }
-            '1'..='9' => {
+            '0'..='9' => {
                 self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
                 let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
                 TokenKind::Literal(Literal::Number { v })
