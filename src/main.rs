@@ -84,6 +84,7 @@ fn print_token(t: &Token) {
                 }
             }
         },
+        TokenKind::Identifier => println!("IDENTIFIER {} {}", t.lexeme, t.lexeme),
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }

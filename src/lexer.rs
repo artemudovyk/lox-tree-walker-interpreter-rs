@@ -42,6 +42,8 @@ pub enum TokenKind<'src> {
     Slash,
     /// `// comment`
     Comment,
+    /// e.g. `foo`, `bar`, `_baz`
+    Identifier,
     /// Any whitespace char
     Whitespace,
     Literal(Literal<'src>),
@@ -225,9 +227,12 @@ impl<'src> Lexer<'src> {
             }
             '1'..='9' => {
                 self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
-                if self.cursor.peek() == '.' {}
                 let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
                 TokenKind::Literal(Literal::Number { v })
+            }
+            'a'..='z' | '_' => {
+                self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
+                TokenKind::Identifier
             }
             c => TokenKind::Unknown {
                 ch: c,
@@ -568,6 +573,40 @@ mod tests {
                     kind: TokenKind::Literal(Literal::Number { v: 1234.32 }),
                     lexeme: "1234.32",
                     len: 7,
+                    line: 1,
+                }]
+            )
+        }
+    }
+
+    mod identifiers {
+        use super::*;
+
+        #[test]
+        fn simple() {
+            let mut lexer = Lexer::new("foo");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Identifier,
+                    lexeme: "foo",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn leading_underscore() {
+            let mut lexer = Lexer::new("_foo");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Identifier,
+                    lexeme: "_foo",
+                    len: 4,
                     line: 1,
                 }]
             )
