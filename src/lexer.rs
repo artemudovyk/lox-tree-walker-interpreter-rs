@@ -1,6 +1,6 @@
 use std::{iter::Peekable, str::Chars};
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum TokenKind<'src> {
     /// `(`
     LeftParen,
@@ -52,12 +52,13 @@ pub enum TokenKind<'src> {
     Eof,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'src> {
     String { s: &'src str, terminated: bool },
+    Number { v: f64 },
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq)]
 pub struct Token<'src> {
     pub kind: TokenKind<'src>,
     pub lexeme: &'src str,
@@ -88,6 +89,7 @@ impl<'src> Token<'src> {
         match &self.kind {
             TokenKind::Literal(literal) => match literal {
                 Literal::String { terminated, .. } => !terminated,
+                _ => false,
             },
             _ => false,
         }
@@ -220,6 +222,12 @@ impl<'src> Lexer<'src> {
                         terminated: true,
                     })
                 }
+            }
+            '1'..'9' => {
+                self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
+                if self.cursor.peek() == '.' {}
+                let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
+                TokenKind::Literal(Literal::Number { v })
             }
             c => TokenKind::Unknown {
                 ch: c,
@@ -515,5 +523,39 @@ mod tests {
                 line: 1,
             }]
         )
+    }
+
+    mod numbers {
+        use super::*;
+
+        #[test]
+        fn integer() {
+            let mut lexer = Lexer::new("1234");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Literal(Literal::Number { v: 1234.0 }),
+                    lexeme: "1234",
+                    len: 4,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn float() {
+            let mut lexer = Lexer::new("1234.32");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Literal(Literal::Number { v: 1234.32 }),
+                    lexeme: "1234.32",
+                    len: 7,
+                    line: 1,
+                }]
+            )
+        }
     }
 }
