@@ -47,6 +47,7 @@ pub enum TokenKind<'src> {
     /// Any whitespace char
     Whitespace,
     Literal(Literal<'src>),
+    Keyword(Keyword),
     Unknown {
         ch: char,
         line: usize,
@@ -58,6 +59,26 @@ pub enum TokenKind<'src> {
 pub enum Literal<'src> {
     String { s: &'src str, terminated: bool },
     Number { v: f64 },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Keyword {
+    Var,
+    Fun,
+    Return,
+    Class,
+    This,
+    Super,
+    Nil,
+    If,
+    Else,
+    And,
+    Or,
+    True,
+    False,
+    For,
+    While,
+    Print,
 }
 
 #[derive(Debug, PartialEq)]
@@ -232,7 +253,26 @@ impl<'src> Lexer<'src> {
             }
             'a'..='z' | '_' => {
                 self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
-                TokenKind::Identifier
+                let v = &self.src[start..self.cursor.byte_pos];
+                match v {
+                    "var" => TokenKind::Keyword(Keyword::Var),
+                    "fun" => TokenKind::Keyword(Keyword::Fun),
+                    "return" => TokenKind::Keyword(Keyword::Return),
+                    "class" => TokenKind::Keyword(Keyword::Class),
+                    "this" => TokenKind::Keyword(Keyword::This),
+                    "super" => TokenKind::Keyword(Keyword::Super),
+                    "nil" => TokenKind::Keyword(Keyword::Nil),
+                    "if" => TokenKind::Keyword(Keyword::If),
+                    "else" => TokenKind::Keyword(Keyword::Else),
+                    "and" => TokenKind::Keyword(Keyword::And),
+                    "or" => TokenKind::Keyword(Keyword::Or),
+                    "true" => TokenKind::Keyword(Keyword::True),
+                    "false" => TokenKind::Keyword(Keyword::False),
+                    "for" => TokenKind::Keyword(Keyword::For),
+                    "while" => TokenKind::Keyword(Keyword::While),
+                    "print" => TokenKind::Keyword(Keyword::Print),
+                    _ => TokenKind::Identifier,
+                }
             }
             c => TokenKind::Unknown {
                 ch: c,
@@ -607,6 +647,239 @@ mod tests {
                     kind: TokenKind::Identifier,
                     lexeme: "_foo",
                     len: 4,
+                    line: 1,
+                }]
+            )
+        }
+    }
+
+    mod keywords {
+        use super::*;
+
+        #[test]
+        fn var() {
+            let mut lexer = Lexer::new("var");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Var),
+                    lexeme: "var",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn fun() {
+            let mut lexer = Lexer::new("fun");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Fun),
+                    lexeme: "fun",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_return() {
+            let mut lexer = Lexer::new("return");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Return),
+                    lexeme: "return",
+                    len: 6,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn class() {
+            let mut lexer = Lexer::new("class");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Class),
+                    lexeme: "class",
+                    len: 5,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn this() {
+            let mut lexer = Lexer::new("this");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::This),
+                    lexeme: "this",
+                    len: 4,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_super() {
+            let mut lexer = Lexer::new("super");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Super),
+                    lexeme: "super",
+                    len: 5,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn nil() {
+            let mut lexer = Lexer::new("nil");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Nil),
+                    lexeme: "nil",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_if() {
+            let mut lexer = Lexer::new("if");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::If),
+                    lexeme: "if",
+                    len: 2,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_else() {
+            let mut lexer = Lexer::new("else");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Else),
+                    lexeme: "else",
+                    len: 4,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn and() {
+            let mut lexer = Lexer::new("and");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::And),
+                    lexeme: "and",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn or() {
+            let mut lexer = Lexer::new("or");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Or),
+                    lexeme: "or",
+                    len: 2,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_true() {
+            let mut lexer = Lexer::new("true");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::True),
+                    lexeme: "true",
+                    len: 4,
+                    line: 1,
+                }]
+            )
+        }
+        #[test]
+        fn k_false() {
+            let mut lexer = Lexer::new("false");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::False),
+                    lexeme: "false",
+                    len: 5,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn k_for() {
+            let mut lexer = Lexer::new("for");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::For),
+                    lexeme: "for",
+                    len: 3,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn k_while() {
+            let mut lexer = Lexer::new("while");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::While),
+                    lexeme: "while",
+                    len: 5,
+                    line: 1,
+                }]
+            )
+        }
+
+        #[test]
+        fn print() {
+            let mut lexer = Lexer::new("print");
+            let tokens = lexer.tokenize();
+            assert_eq!(
+                tokens,
+                vec![Token {
+                    kind: TokenKind::Keyword(Keyword::Print),
+                    lexeme: "print",
+                    len: 5,
                     line: 1,
                 }]
             )

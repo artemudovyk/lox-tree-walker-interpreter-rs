@@ -1,4 +1,5 @@
 #![allow(unused_variables)]
+use codecrafters_interpreter::lexer::Keyword;
 use codecrafters_interpreter::lexer::Lexer;
 use codecrafters_interpreter::lexer::Literal;
 use codecrafters_interpreter::lexer::Token;
@@ -88,6 +89,24 @@ fn print_token(t: &Token) {
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }
+        TokenKind::Keyword(keyword) => match keyword {
+            Keyword::Var => println!("VAR {} null", t.lexeme),
+            Keyword::Fun => println!("FUN {} null", t.lexeme),
+            Keyword::Return => println!("RETURN {} null", t.lexeme),
+            Keyword::Class => println!("CLASS {} null", t.lexeme),
+            Keyword::This => println!("THIS {} null", t.lexeme),
+            Keyword::Super => println!("SUPER {} null", t.lexeme),
+            Keyword::Nil => println!("NIL {} null", t.lexeme),
+            Keyword::If => println!("IF {} null", t.lexeme),
+            Keyword::Else => println!("ELSE {} null", t.lexeme),
+            Keyword::And => println!("AND {} null", t.lexeme),
+            Keyword::Or => println!("OR {} null", t.lexeme),
+            Keyword::True => println!("TRUE {} null", t.lexeme),
+            Keyword::False => println!("FALSE {} null", t.lexeme),
+            Keyword::For => println!("FOR {} null", t.lexeme),
+            Keyword::While => println!("WHILE {} null", t.lexeme),
+            Keyword::Print => println!("PRINT {} null", t.lexeme),
+        },
         TokenKind::Whitespace | TokenKind::Comment | TokenKind::Eof => {}
     }
 }
