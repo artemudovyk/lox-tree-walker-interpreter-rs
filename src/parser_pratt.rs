@@ -1,14 +1,18 @@
-use crate::lexer::{Lexer, Literal, TokenKind};
+use crate::lexer::{Keyword, Lexer, Literal, TokenKind};
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Atom {
     Number(f64),
+    Bool(bool),
+    Nil,
 }
 
 impl std::fmt::Display for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Number(n) => write!(f, "{}", n),
+            Self::Bool(bool) => write!(f, "{}", bool),
+            Self::Nil => write!(f, "nil"),
         }
     }
 }
@@ -74,6 +78,9 @@ impl<'src> Parser<'src> {
         let mut lhs = loop {
             match dbg!(self.lexer.next_token()).kind {
                 TokenKind::Literal(Literal::Number(n)) => break Expr::Atom(Atom::Number(n)),
+                TokenKind::Keyword(Keyword::True) => return Expr::Atom(Atom::Bool(true)),
+                TokenKind::Keyword(Keyword::False) => return Expr::Atom(Atom::Bool(false)),
+                TokenKind::Keyword(Keyword::Nil) => return Expr::Atom(Atom::Nil),
                 TokenKind::Whitespace => continue,
                 t => panic!("bad lhs token: {:?}", t),
             }
@@ -142,5 +149,26 @@ mod tests {
         let mut parser = Parser::new("2 + 3 * 4 + 5");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(+ (+ 2 (* 3 4)) 5)");
+    }
+
+    #[test]
+    fn k_true() {
+        let mut parser = Parser::new("true");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "true");
+    }
+
+    #[test]
+    fn k_false() {
+        let mut parser = Parser::new("false");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "false");
+    }
+
+    #[test]
+    fn nil() {
+        let mut parser = Parser::new("nil");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "nil");
     }
 }
