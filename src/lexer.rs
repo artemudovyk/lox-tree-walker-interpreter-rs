@@ -167,7 +167,6 @@ pub struct Lexer<'src> {
 
 impl<'src> Lexer<'src> {
     pub fn new(src: &'src str) -> Self {
-        println!("Created lexer for {src}");
         Self {
             src,
             cursor: Cursor::new(src.chars()),
@@ -178,7 +177,6 @@ impl<'src> Lexer<'src> {
     pub fn next_token(&mut self) -> Token<'src> {
         // Return a buffered token if present, otherwise continue with the regular execution
         if let Some(token) = self.peeked.take() {
-            println!("Returning {token:?}");
             return token;
         }
 

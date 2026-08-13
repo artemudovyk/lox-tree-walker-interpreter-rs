@@ -76,7 +76,7 @@ impl<'src> Parser<'src> {
 
     pub fn exprs_bp(&mut self, min_bp: u8) -> Expr {
         let mut lhs = loop {
-            match dbg!(self.lexer.next_token()).kind {
+            match self.lexer.next_token().kind {
                 TokenKind::Literal(Literal::Number(n)) => break Expr::Atom(Atom::Number(n)),
                 TokenKind::Keyword(Keyword::True) => return Expr::Atom(Atom::Bool(true)),
                 TokenKind::Keyword(Keyword::False) => return Expr::Atom(Atom::Bool(false)),
