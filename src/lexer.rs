@@ -58,7 +58,7 @@ pub enum TokenKind<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'src> {
     String { s: &'src str, terminated: bool },
-    Number { v: f64 },
+    Number(f64),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -162,17 +162,26 @@ impl<'a> Cursor<'a> {
 pub struct Lexer<'src> {
     src: &'src str,
     cursor: Cursor<'src>,
+    peeked: Option<Token<'src>>,
 }
 
 impl<'src> Lexer<'src> {
     pub fn new(src: &'src str) -> Self {
+        println!("Created lexer for {src}");
         Self {
             src,
             cursor: Cursor::new(src.chars()),
+            peeked: None,
         }
     }
 
     pub fn next_token(&mut self) -> Token<'src> {
+        // Return a buffered token if present, otherwise continue with the regular execution
+        if let Some(token) = self.peeked.take() {
+            println!("Returning {token:?}");
+            return token;
+        }
+
         let start = self.cursor.byte_pos;
         let Some(ch) = self.cursor.bump() else {
             return Token::eof(self.cursor.line);
@@ -249,7 +258,7 @@ impl<'src> Lexer<'src> {
             '0'..='9' => {
                 self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
                 let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
-                TokenKind::Literal(Literal::Number { v })
+                TokenKind::Literal(Literal::Number(v))
             }
             'a'..='z' | 'A'..='Z' | '_' => {
                 self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
@@ -282,6 +291,20 @@ impl<'src> Lexer<'src> {
 
         let lexeme = &self.src[start..self.cursor.byte_pos];
         Token::new(token_kind, lexeme, lexeme.chars().count(), self.cursor.line)
+    }
+
+    /// Peek into the next token. Peeked token is cached under the hood and will be returned in
+    /// `next_token()` call.
+    pub fn peek(&mut self) -> &Token<'src> {
+        if self.peeked.is_none() {
+            self.peeked = Some(self.next_token());
+        }
+        self.peeked.as_ref().unwrap()
+    }
+
+    /// Convenience method around `next_token()` to consume the next token and advance cursor.
+    pub fn advance(&mut self) {
+        self.next_token();
     }
 
     pub fn tokenize(&mut self) -> Vec<Token<'src>> {
@@ -580,7 +603,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![Token {
-                    kind: TokenKind::Literal(Literal::Number { v: 1234.0 }),
+                    kind: TokenKind::Literal(Literal::Number(1234.0)),
                     lexeme: "1234",
                     len: 4,
                     line: 1,
@@ -595,7 +618,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![Token {
-                    kind: TokenKind::Literal(Literal::Number { v: 9123.0 }),
+                    kind: TokenKind::Literal(Literal::Number(9123.0)),
                     lexeme: "9123",
                     len: 4,
                     line: 1,
@@ -610,7 +633,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![Token {
-                    kind: TokenKind::Literal(Literal::Number { v: 1234.32 }),
+                    kind: TokenKind::Literal(Literal::Number(1234.32)),
                     lexeme: "1234.32",
                     len: 7,
                     line: 1,

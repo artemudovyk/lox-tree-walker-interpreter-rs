@@ -4,6 +4,7 @@ use codecrafters_interpreter::lexer::Lexer;
 use codecrafters_interpreter::lexer::Literal;
 use codecrafters_interpreter::lexer::Token;
 use codecrafters_interpreter::lexer::TokenKind;
+use codecrafters_interpreter::parser_pratt::Parser;
 use std::env;
 use std::fs;
 
@@ -19,9 +20,6 @@ fn main() {
 
     match command.as_str() {
         "tokenize" => {
-            // You can use print statements as follows for debugging, they'll be visible when running tests.
-            eprintln!("Logs from your program will appear here!");
-
             let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
                 eprintln!("Failed to read file {}", filename);
                 String::new()
@@ -41,6 +39,15 @@ fn main() {
             if !is_valid {
                 std::process::exit(65)
             }
+        }
+        "parse" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                eprintln!("Failed to read file {}", filename);
+                String::new()
+            });
+            let mut parser = Parser::new(&file_contents);
+            let expr = parser.parse();
+            println!("{expr}");
         }
         _ => {
             eprintln!("Unknown command: {}", command);
@@ -77,11 +84,11 @@ fn print_token(t: &Token) {
                     eprintln!("[line {}] Error: Unterminated string.", t.line)
                 }
             }
-            Literal::Number { v } => {
-                if *v == v.trunc() {
-                    println!("NUMBER {} {:.1}", t.lexeme, v)
+            Literal::Number(n) => {
+                if *n == n.trunc() {
+                    println!("NUMBER {} {:.1}", t.lexeme, n)
                 } else {
-                    println!("NUMBER {} {}", t.lexeme, v)
+                    println!("NUMBER {} {}", t.lexeme, n)
                 }
             }
         },
