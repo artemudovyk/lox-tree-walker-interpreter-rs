@@ -10,6 +10,7 @@ pub enum Atom {
 impl std::fmt::Display for Atom {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::Number(n) if *n == n.trunc() => write!(f, "{:.01}", n),
             Self::Number(n) => write!(f, "{}", n),
             Self::Bool(bool) => write!(f, "{}", bool),
             Self::Nil => write!(f, "nil"),
@@ -44,7 +45,7 @@ pub enum Expr {
 impl std::fmt::Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Expr::Atom(i) => write!(f, "{}", i),
+            Expr::Atom(a) => write!(f, "{}", a),
             Expr::Cons(head, rest) => {
                 write!(f, "({}", head)?;
                 for s in rest {
@@ -134,21 +135,21 @@ mod tests {
     fn add() {
         let mut parser = Parser::new("2 + 3");
         let expr = parser.next_expr();
-        assert_eq!(format!("{expr}"), "(+ 2 3)");
+        assert_eq!(format!("{expr}"), "(+ 2.0 3.0)");
     }
 
     #[test]
     fn add_mult() {
         let mut parser = Parser::new("2 + 3 * 4");
         let expr = parser.next_expr();
-        assert_eq!(format!("{expr}"), "(+ 2 (* 3 4))");
+        assert_eq!(format!("{expr}"), "(+ 2.0 (* 3.0 4.0))");
     }
 
     #[test]
     fn add_mult_add() {
         let mut parser = Parser::new("2 + 3 * 4 + 5");
         let expr = parser.next_expr();
-        assert_eq!(format!("{expr}"), "(+ (+ 2 (* 3 4)) 5)");
+        assert_eq!(format!("{expr}"), "(+ (+ 2.0 (* 3.0 4.0)) 5.0)");
     }
 
     #[test]
@@ -170,5 +171,23 @@ mod tests {
         let mut parser = Parser::new("nil");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "nil");
+    }
+
+    #[test]
+    fn number() {
+        let mut parser = Parser::new("42.47");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "42.47");
+
+        let mut parser = Parser::new("42");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "42.0");
+    }
+
+    #[test]
+    fn zero() {
+        let mut parser = Parser::new("0.0");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "0.0");
     }
 }
