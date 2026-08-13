@@ -1,15 +1,17 @@
 use crate::lexer::{Keyword, Lexer, Literal, TokenKind};
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Atom {
+pub enum Atom<'src> {
+    String(&'src str),
     Number(f64),
     Bool(bool),
     Nil,
 }
 
-impl std::fmt::Display for Atom {
+impl<'src> std::fmt::Display for Atom<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::String(s) => write!(f, "{}", s),
             Self::Number(n) if *n == n.trunc() => write!(f, "{:.01}", n),
             Self::Number(n) => write!(f, "{}", n),
             Self::Bool(bool) => write!(f, "{}", bool),
@@ -36,13 +38,13 @@ impl std::fmt::Display for Op {
 
 /// S-expression
 #[derive(Debug, Clone, PartialEq)]
-pub enum Expr {
-    Atom(Atom),
+pub enum Expr<'src> {
+    Atom(Atom<'src>),
     /// Construct
-    Cons(Op, Vec<Expr>),
+    Cons(Op, Vec<Expr<'src>>),
 }
 
-impl std::fmt::Display for Expr {
+impl<'src> std::fmt::Display for Expr<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Expr::Atom(a) => write!(f, "{}", a),
@@ -71,14 +73,15 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn parse(&mut self) -> Expr {
+    pub fn parse(&mut self) -> Expr<'src> {
         self.exprs_bp(0)
     }
 
-    pub fn exprs_bp(&mut self, min_bp: u8) -> Expr {
+    pub fn exprs_bp(&mut self, min_bp: u8) -> Expr<'src> {
         let mut lhs = loop {
             match self.lexer.next_token().kind {
                 TokenKind::Literal(Literal::Number(n)) => break Expr::Atom(Atom::Number(n)),
+                TokenKind::Literal(Literal::String { s, .. }) => break Expr::Atom(Atom::String(s)),
                 TokenKind::Keyword(Keyword::True) => return Expr::Atom(Atom::Bool(true)),
                 TokenKind::Keyword(Keyword::False) => return Expr::Atom(Atom::Bool(false)),
                 TokenKind::Keyword(Keyword::Nil) => return Expr::Atom(Atom::Nil),
@@ -114,7 +117,7 @@ impl<'src> Parser<'src> {
         lhs
     }
 
-    pub fn next_expr(&mut self) -> Expr {
+    pub fn next_expr(&mut self) -> Expr<'src> {
         self.exprs_bp(0)
     }
 }
@@ -189,5 +192,12 @@ mod tests {
         let mut parser = Parser::new("0.0");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "0.0");
+    }
+
+    #[test]
+    fn string() {
+        let mut parser = Parser::new("\"hello\"");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "hello");
     }
 }
