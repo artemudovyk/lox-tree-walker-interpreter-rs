@@ -25,6 +25,7 @@ impl<'src> std::fmt::Display for Atom<'src> {
 pub enum Op {
     Add,
     Mult,
+    Group,
 }
 
 impl std::fmt::Display for Op {
@@ -32,6 +33,7 @@ impl std::fmt::Display for Op {
         match self {
             Self::Add => write!(f, "+"),
             Self::Mult => write!(f, "*"),
+            Self::Group => write!(f, "group"),
         }
     }
 }
@@ -82,6 +84,11 @@ impl<'src> Parser<'src> {
             match self.lexer.next_token().kind {
                 TokenKind::Literal(Literal::Number(n)) => break Expr::Atom(Atom::Number(n)),
                 TokenKind::Literal(Literal::String { s, .. }) => break Expr::Atom(Atom::String(s)),
+                TokenKind::LeftParen => {
+                    let lhs = self.exprs_bp(0);
+                    self.lexer.advance();
+                    break Expr::Cons(Op::Group, vec![lhs]);
+                }
                 TokenKind::Keyword(Keyword::True) => return Expr::Atom(Atom::Bool(true)),
                 TokenKind::Keyword(Keyword::False) => return Expr::Atom(Atom::Bool(false)),
                 TokenKind::Keyword(Keyword::Nil) => return Expr::Atom(Atom::Nil),
@@ -94,6 +101,7 @@ impl<'src> Parser<'src> {
             let op = match &self.lexer.peek().kind {
                 TokenKind::Plus => Op::Add,
                 TokenKind::Star => Op::Mult,
+                TokenKind::RightParen => break,
                 TokenKind::Whitespace => {
                     self.lexer.advance();
                     continue;
@@ -102,16 +110,19 @@ impl<'src> Parser<'src> {
                 t => panic!("bad op token: {:?}", t),
             };
 
-            let (l_bp, r_bp) = infix_binding_power(&op);
-            // If true, we finished with this subtree
-            if l_bp < min_bp {
-                break;
+            if let Some((l_bp, r_bp)) = infix_binding_power(&op) {
+                // If true, we finished with this subtree
+                if l_bp < min_bp {
+                    break;
+                }
+                // Otherwise advance token cursor and make a recursive call to build rhs
+                self.lexer.advance();
+                let rhs = self.exprs_bp(r_bp);
+                lhs = Expr::Cons(op, vec![lhs, rhs]);
+                continue;
             }
-            // Otherwise advance token cursor and make a recursive call to build rhs
-            self.lexer.advance();
-            let rhs = self.exprs_bp(r_bp);
 
-            lhs = Expr::Cons(op, vec![lhs, rhs]);
+            break;
         }
 
         lhs
@@ -122,11 +133,11 @@ impl<'src> Parser<'src> {
     }
 }
 
-fn infix_binding_power(op: &Op) -> (u8, u8) {
+fn infix_binding_power(op: &Op) -> Option<(u8, u8)> {
     match op {
-        Op::Add => (1, 2),
-        Op::Mult => (3, 4),
-        // _ => panic!("bad op: {:?}", op),
+        Op::Add => Some((1, 2)),
+        Op::Mult => Some((3, 4)),
+        _ => None,
     }
 }
 
@@ -199,5 +210,12 @@ mod tests {
         let mut parser = Parser::new("\"hello\"");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "hello");
+    }
+
+    #[test]
+    fn group() {
+        let mut parser = Parser::new("(\"foo\")");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(group foo)");
     }
 }
