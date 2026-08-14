@@ -26,6 +26,7 @@ pub enum Op {
     Add,
     Mult,
     Group,
+    Bang,
 }
 
 impl std::fmt::Display for Op {
@@ -34,6 +35,7 @@ impl std::fmt::Display for Op {
             Self::Add => write!(f, "+"),
             Self::Mult => write!(f, "*"),
             Self::Group => write!(f, "group"),
+            Self::Bang => write!(f, "!"),
         }
     }
 }
@@ -89,6 +91,13 @@ impl<'src> Parser<'src> {
                     self.lexer.advance();
                     break Expr::Cons(Op::Group, vec![lhs]);
                 }
+                TokenKind::Bang => {
+                    let op = Op::Bang;
+                    let (_, r_bp) = prefix_binding_power(&op);
+                    let rhs = self.exprs_bp(r_bp);
+                    self.lexer.advance();
+                    break Expr::Cons(op, vec![rhs]);
+                }
                 TokenKind::Keyword(Keyword::True) => return Expr::Atom(Atom::Bool(true)),
                 TokenKind::Keyword(Keyword::False) => return Expr::Atom(Atom::Bool(false)),
                 TokenKind::Keyword(Keyword::Nil) => return Expr::Atom(Atom::Nil),
@@ -138,6 +147,13 @@ fn infix_binding_power(op: &Op) -> Option<(u8, u8)> {
         Op::Add => Some((1, 2)),
         Op::Mult => Some((3, 4)),
         _ => None,
+    }
+}
+
+fn prefix_binding_power(op: &Op) -> ((), u8) {
+    match op {
+        Op::Bang => ((), 11),
+        _ => ((), 0),
     }
 }
 
@@ -217,5 +233,12 @@ mod tests {
         let mut parser = Parser::new("(\"foo\")");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(group foo)");
+    }
+
+    #[test]
+    fn bang_bool() {
+        let mut parser = Parser::new("!true");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(! true)");
     }
 }
