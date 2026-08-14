@@ -27,6 +27,7 @@ pub enum Op {
     Mult,
     Group,
     Bang,
+    Minus,
 }
 
 impl std::fmt::Display for Op {
@@ -36,6 +37,7 @@ impl std::fmt::Display for Op {
             Self::Mult => write!(f, "*"),
             Self::Group => write!(f, "group"),
             Self::Bang => write!(f, "!"),
+            Self::Minus => write!(f, "-"),
         }
     }
 }
@@ -93,6 +95,13 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Bang => {
                     let op = Op::Bang;
+                    let (_, r_bp) = prefix_binding_power(&op);
+                    let rhs = self.exprs_bp(r_bp);
+                    self.lexer.advance();
+                    break Expr::Cons(op, vec![rhs]);
+                }
+                TokenKind::Minus => {
+                    let op = Op::Minus;
                     let (_, r_bp) = prefix_binding_power(&op);
                     let rhs = self.exprs_bp(r_bp);
                     self.lexer.advance();
@@ -240,5 +249,12 @@ mod tests {
         let mut parser = Parser::new("!true");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(! true)");
+    }
+
+    #[test]
+    fn minus_number() {
+        let mut parser = Parser::new("-70");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(- 70.0)");
     }
 }
