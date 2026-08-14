@@ -24,7 +24,9 @@ impl<'src> std::fmt::Display for Atom<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Add,
+    Sub,
     Mult,
+    Div,
     Group,
     Bang,
     Minus,
@@ -34,10 +36,12 @@ impl std::fmt::Display for Op {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Add => write!(f, "+"),
+            Self::Sub => write!(f, "-"),
             Self::Mult => write!(f, "*"),
             Self::Group => write!(f, "group"),
             Self::Bang => write!(f, "!"),
             Self::Minus => write!(f, "-"),
+            Self::Div => write!(f, "/"),
         }
     }
 }
@@ -118,7 +122,9 @@ impl<'src> Parser<'src> {
         loop {
             let op = match &self.lexer.peek().kind {
                 TokenKind::Plus => Op::Add,
+                TokenKind::Minus => Op::Sub,
                 TokenKind::Star => Op::Mult,
+                TokenKind::Slash => Op::Div,
                 TokenKind::RightParen => break,
                 TokenKind::Whitespace => {
                     self.lexer.advance();
@@ -153,8 +159,8 @@ impl<'src> Parser<'src> {
 
 fn infix_binding_power(op: &Op) -> Option<(u8, u8)> {
     match op {
-        Op::Add => Some((1, 2)),
-        Op::Mult => Some((3, 4)),
+        Op::Add | Op::Sub => Some((1, 2)),
+        Op::Mult | Op::Div => Some((3, 4)),
         _ => None,
     }
 }
@@ -256,5 +262,12 @@ mod tests {
         let mut parser = Parser::new("-70");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(- 70.0)");
+    }
+
+    #[test]
+    fn mult_div() {
+        let mut parser = Parser::new("16 * 38 / 58");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(/ (* 16.0 38.0) 58.0)");
     }
 }
