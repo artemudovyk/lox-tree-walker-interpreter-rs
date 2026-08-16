@@ -167,7 +167,7 @@ fn infix_binding_power(op: &Op) -> Option<(u8, u8)> {
 
 fn prefix_binding_power(op: &Op) -> ((), u8) {
     match op {
-        Op::Bang => ((), 11),
+        Op::Bang | Op::Minus => ((), 11),
         _ => ((), 0),
     }
 }
@@ -269,5 +269,17 @@ mod tests {
         let mut parser = Parser::new("16 * 38 / 58");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(/ (* 16.0 38.0) 58.0)");
+    }
+
+    #[test]
+    fn mix() {
+        let mut parser = Parser::new("(82 * -27 / (34 * 66))");
+        let expr = parser.next_expr();
+        assert_eq!(
+            format!("{expr}"),
+            // have: "(group (* 82.0 (- (/ 27.0 (group (* 34.0 66.0))))))"
+            // need: "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
+            "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
+        );
     }
 }

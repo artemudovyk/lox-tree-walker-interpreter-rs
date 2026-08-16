@@ -117,6 +117,10 @@ impl<'src> Token<'src> {
             _ => false,
         }
     }
+
+    pub fn is_eof(&self) -> bool {
+        matches!(self.kind, TokenKind::Eof)
+    }
 }
 
 struct Cursor<'a> {
@@ -180,111 +184,113 @@ impl<'src> Lexer<'src> {
             return token;
         }
 
+        // Skip all whitespace chars
+        while self.cursor.peek().is_whitespace() {
+            self.cursor.bump();
+        }
+
         let start = self.cursor.byte_pos;
         let Some(ch) = self.cursor.bump() else {
             return Token::eof(self.cursor.line);
         };
 
-        let token_kind = match ch {
-            c if c.is_whitespace() => {
-                while self.cursor.peek().is_whitespace() {
-                    self.cursor.bump();
+        let token_kind = loop {
+            let kind = match ch {
+                '(' => TokenKind::LeftParen,
+                ')' => TokenKind::RightParen,
+                '{' => TokenKind::LeftBrace,
+                '}' => TokenKind::RightBrace,
+                '*' => TokenKind::Star,
+                ',' => TokenKind::Comma,
+                '.' => TokenKind::Dot,
+                '+' => TokenKind::Plus,
+                '-' => TokenKind::Minus,
+                ';' => TokenKind::Semicolon,
+                '=' => match self.cursor.peek() {
+                    '=' => {
+                        self.cursor.bump();
+                        TokenKind::EqualEqual
+                    }
+                    _ => TokenKind::Equal,
+                },
+                '!' => match self.cursor.peek() {
+                    '=' => {
+                        self.cursor.bump();
+                        TokenKind::BangEqual
+                    }
+                    _ => TokenKind::Bang,
+                },
+                '<' => match self.cursor.peek() {
+                    '=' => {
+                        self.cursor.bump();
+                        TokenKind::LessEqual
+                    }
+                    _ => TokenKind::Less,
+                },
+                '>' => match self.cursor.peek() {
+                    '=' => {
+                        self.cursor.bump();
+                        TokenKind::GreaterEqual
+                    }
+                    _ => TokenKind::Greater,
+                },
+                '/' => match self.cursor.peek() {
+                    '/' => {
+                        self.cursor.eat_while(|v| v != '\n' && v != EOF_CHAR);
+                        TokenKind::Comment
+                    }
+                    _ => TokenKind::Slash,
+                },
+                '"' => {
+                    self.cursor
+                        .eat_while(|v| v != '"' && v != '\n' && v != EOF_CHAR);
+                    if self.cursor.peek() == EOF_CHAR || self.cursor.peek() == '\n' {
+                        TokenKind::Literal(Literal::String {
+                            s: "",
+                            terminated: false,
+                        })
+                    } else {
+                        self.cursor.bump();
+                        TokenKind::Literal(Literal::String {
+                            s: &self.src[start..self.cursor.byte_pos].trim_matches(|v| v == '"'),
+                            terminated: true,
+                        })
+                    }
                 }
-                TokenKind::Whitespace
-            }
-            '(' => TokenKind::LeftParen,
-            ')' => TokenKind::RightParen,
-            '{' => TokenKind::LeftBrace,
-            '}' => TokenKind::RightBrace,
-            '*' => TokenKind::Star,
-            ',' => TokenKind::Comma,
-            '.' => TokenKind::Dot,
-            '+' => TokenKind::Plus,
-            '-' => TokenKind::Minus,
-            ';' => TokenKind::Semicolon,
-            '=' => match self.cursor.peek() {
-                '=' => {
-                    self.cursor.bump();
-                    TokenKind::EqualEqual
+                '0'..='9' => {
+                    self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
+                    let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
+                    TokenKind::Literal(Literal::Number(v))
                 }
-                _ => TokenKind::Equal,
-            },
-            '!' => match self.cursor.peek() {
-                '=' => {
-                    self.cursor.bump();
-                    TokenKind::BangEqual
+                'a'..='z' | 'A'..='Z' | '_' => {
+                    self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
+                    let v = &self.src[start..self.cursor.byte_pos];
+                    match v {
+                        "var" => TokenKind::Keyword(Keyword::Var),
+                        "fun" => TokenKind::Keyword(Keyword::Fun),
+                        "return" => TokenKind::Keyword(Keyword::Return),
+                        "class" => TokenKind::Keyword(Keyword::Class),
+                        "this" => TokenKind::Keyword(Keyword::This),
+                        "super" => TokenKind::Keyword(Keyword::Super),
+                        "nil" => TokenKind::Keyword(Keyword::Nil),
+                        "if" => TokenKind::Keyword(Keyword::If),
+                        "else" => TokenKind::Keyword(Keyword::Else),
+                        "and" => TokenKind::Keyword(Keyword::And),
+                        "or" => TokenKind::Keyword(Keyword::Or),
+                        "true" => TokenKind::Keyword(Keyword::True),
+                        "false" => TokenKind::Keyword(Keyword::False),
+                        "for" => TokenKind::Keyword(Keyword::For),
+                        "while" => TokenKind::Keyword(Keyword::While),
+                        "print" => TokenKind::Keyword(Keyword::Print),
+                        _ => TokenKind::Identifier,
+                    }
                 }
-                _ => TokenKind::Bang,
-            },
-            '<' => match self.cursor.peek() {
-                '=' => {
-                    self.cursor.bump();
-                    TokenKind::LessEqual
-                }
-                _ => TokenKind::Less,
-            },
-            '>' => match self.cursor.peek() {
-                '=' => {
-                    self.cursor.bump();
-                    TokenKind::GreaterEqual
-                }
-                _ => TokenKind::Greater,
-            },
-            '/' => match self.cursor.peek() {
-                '/' => {
-                    self.cursor.eat_while(|v| v != '\n' && v != EOF_CHAR);
-                    TokenKind::Comment
-                }
-                _ => TokenKind::Slash,
-            },
-            '"' => {
-                self.cursor
-                    .eat_while(|v| v != '"' && v != '\n' && v != EOF_CHAR);
-                if self.cursor.peek() == EOF_CHAR || self.cursor.peek() == '\n' {
-                    TokenKind::Literal(Literal::String {
-                        s: "",
-                        terminated: false,
-                    })
-                } else {
-                    self.cursor.bump();
-                    TokenKind::Literal(Literal::String {
-                        s: &self.src[start..self.cursor.byte_pos].trim_matches(|v| v == '"'),
-                        terminated: true,
-                    })
-                }
-            }
-            '0'..='9' => {
-                self.cursor.eat_while(|v| v.is_digit(10) || v == '.');
-                let v: f64 = self.src[start..self.cursor.byte_pos].parse().unwrap();
-                TokenKind::Literal(Literal::Number(v))
-            }
-            'a'..='z' | 'A'..='Z' | '_' => {
-                self.cursor.eat_while(|v| v.is_alphanumeric() || v == '_');
-                let v = &self.src[start..self.cursor.byte_pos];
-                match v {
-                    "var" => TokenKind::Keyword(Keyword::Var),
-                    "fun" => TokenKind::Keyword(Keyword::Fun),
-                    "return" => TokenKind::Keyword(Keyword::Return),
-                    "class" => TokenKind::Keyword(Keyword::Class),
-                    "this" => TokenKind::Keyword(Keyword::This),
-                    "super" => TokenKind::Keyword(Keyword::Super),
-                    "nil" => TokenKind::Keyword(Keyword::Nil),
-                    "if" => TokenKind::Keyword(Keyword::If),
-                    "else" => TokenKind::Keyword(Keyword::Else),
-                    "and" => TokenKind::Keyword(Keyword::And),
-                    "or" => TokenKind::Keyword(Keyword::Or),
-                    "true" => TokenKind::Keyword(Keyword::True),
-                    "false" => TokenKind::Keyword(Keyword::False),
-                    "for" => TokenKind::Keyword(Keyword::For),
-                    "while" => TokenKind::Keyword(Keyword::While),
-                    "print" => TokenKind::Keyword(Keyword::Print),
-                    _ => TokenKind::Identifier,
-                }
-            }
-            c => TokenKind::Unknown {
-                ch: c,
-                line: self.cursor.line,
-            },
+                c => TokenKind::Unknown {
+                    ch: c,
+                    line: self.cursor.line,
+                },
+            };
+            break kind;
         };
 
         let lexeme = &self.src[start..self.cursor.byte_pos];
