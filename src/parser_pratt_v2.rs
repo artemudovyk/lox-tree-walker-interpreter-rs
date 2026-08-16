@@ -78,6 +78,10 @@ pub enum Op {
     Group,
     Bang,
     Minus,
+    Less,
+    LessEq,
+    Greater,
+    GreaterEq,
 }
 
 impl std::fmt::Display for Op {
@@ -89,6 +93,10 @@ impl std::fmt::Display for Op {
             Self::Div => write!(f, "/"),
             Self::Group => write!(f, "group"),
             Self::Bang => write!(f, "!"),
+            Self::Less => write!(f, "<"),
+            Self::LessEq => write!(f, "<="),
+            Self::Greater => write!(f, ">"),
+            Self::GreaterEq => write!(f, ">="),
         }
     }
 }
@@ -96,8 +104,9 @@ impl std::fmt::Display for Op {
 impl Op {
     fn infix_bp(&self) -> Option<(u8, u8)> {
         match self {
-            Self::Add | Self::Minus => Some((1, 2)),
-            Self::Mult | Self::Div => Some((3, 4)),
+            Self::Less | Self::LessEq | Self::Greater | Self::GreaterEq => Some((1, 2)),
+            Self::Add | Self::Minus => Some((3, 4)),
+            Self::Mult | Self::Div => Some((5, 6)),
             _ => None,
         }
     }
@@ -121,6 +130,10 @@ impl<'src> TryFrom<&Token<'src>> for Op {
             TokenKind::Bang => Ok(Op::Bang),
             TokenKind::Minus => Ok(Op::Minus),
             TokenKind::Slash => Ok(Op::Div),
+            TokenKind::Less => Ok(Op::Less),
+            TokenKind::LessEqual => Ok(Op::LessEq),
+            TokenKind::Greater => Ok(Op::Greater),
+            TokenKind::GreaterEqual => Ok(Op::GreaterEq),
             _ => Err(()),
         }
     }
@@ -311,12 +324,40 @@ mod tests {
     }
 
     #[test]
-    fn mix() {
+    fn mix_expression() {
         let mut parser = Parser::new("(82 * -27 / (34 * 66))");
         let expr = parser.next_expr();
         assert_eq!(
             format!("{expr}"),
             "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
         );
+    }
+
+    #[test]
+    fn less() {
+        let mut parser = Parser::new("83 < 99");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(< 83.0 99.0)");
+    }
+
+    #[test]
+    fn less_eq() {
+        let mut parser = Parser::new("83 <= 99");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(<= 83.0 99.0)");
+    }
+
+    #[test]
+    fn greater() {
+        let mut parser = Parser::new("83 > 99");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(> 83.0 99.0)");
+    }
+
+    #[test]
+    fn greater_eq() {
+        let mut parser = Parser::new("83 >= 99");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(>= 83.0 99.0)");
     }
 }
