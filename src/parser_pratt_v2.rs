@@ -310,15 +310,13 @@ mod tests {
         assert_eq!(format!("{expr}"), "(/ (* 16.0 38.0) 58.0)");
     }
 
-    // #[test]
-    // fn mix() {
-    //     let mut parser = Parser::new("(82 * -27 / (34 * 66))");
-    //     let expr = parser.next_expr();
-    //     assert_eq!(
-    //         format!("{expr}"),
-    //         // have: "(group (* 82.0 (- (/ 27.0 (group (* 34.0 66.0))))))"
-    //         // need: "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
-    //         "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
-    //     );
-    // }
+    #[test]
+    fn mix() {
+        let mut parser = Parser::new("(82 * -27 / (34 * 66))");
+        let expr = parser.next_expr();
+        assert_eq!(
+            format!("{expr}"),
+            "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
+        );
+    }
 }
