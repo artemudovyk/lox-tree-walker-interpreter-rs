@@ -44,7 +44,7 @@ fn main() {
                 String::new()
             });
             let mut parser = Parser::new(&file_contents);
-            let expr = parser.parse();
+            let expr = parser.next_expr();
             println!("{expr}");
         }
         _ => {

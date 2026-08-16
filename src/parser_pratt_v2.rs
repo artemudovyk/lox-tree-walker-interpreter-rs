@@ -2,7 +2,7 @@
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
 #[derive(Debug)]
-enum Expr<'src> {
+pub enum Expr<'src> {
     Atom(Atom<'src>),
     Cons(Op, Vec<Expr<'src>>),
 }
@@ -23,7 +23,7 @@ impl<'src> std::fmt::Display for Expr<'src> {
 }
 
 #[derive(Debug)]
-enum Atom<'src> {
+pub enum Atom<'src> {
     Number(f64),
     String(&'src str),
     Bool(bool),
@@ -71,7 +71,7 @@ impl<'src> TryFrom<Token<'src>> for Atom<'src> {
 }
 
 #[derive(Debug)]
-enum Op {
+pub enum Op {
     Add,
     Mult,
     Div,
@@ -134,7 +134,7 @@ impl<'src> TryFrom<Token<'src>> for Op {
     }
 }
 
-struct Parser<'src> {
+pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
 }
