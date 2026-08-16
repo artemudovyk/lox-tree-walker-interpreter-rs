@@ -23,13 +23,13 @@ pub enum TokenKind<'src> {
     /// `*`
     Star,
     /// `=`
-    Equal,
+    Eq,
     /// `==`
-    EqualEqual,
+    EqEq,
     /// `!`
     Bang,
     /// `!=`
-    BangEqual,
+    BangEq,
     /// `<`
     Less,
     /// `<=`
@@ -208,14 +208,14 @@ impl<'src> Lexer<'src> {
             '=' => match self.cursor.peek() {
                 '=' => {
                     self.cursor.bump();
-                    TokenKind::EqualEqual
+                    TokenKind::EqEq
                 }
-                _ => TokenKind::Equal,
+                _ => TokenKind::Eq,
             },
             '!' => match self.cursor.peek() {
                 '=' => {
                     self.cursor.bump();
-                    TokenKind::BangEqual
+                    TokenKind::BangEq
                 }
                 _ => TokenKind::Bang,
             },
@@ -464,7 +464,7 @@ mod tests {
         assert!(
             lexer
                 .next()
-                .is_some_and(|v| matches!(v.kind, TokenKind::Equal))
+                .is_some_and(|v| matches!(v.kind, TokenKind::Eq))
         );
     }
 
@@ -474,7 +474,7 @@ mod tests {
         assert!(
             lexer
                 .next()
-                .is_some_and(|v| matches!(v.kind, TokenKind::EqualEqual))
+                .is_some_and(|v| matches!(v.kind, TokenKind::EqEq))
         );
     }
 
@@ -494,7 +494,7 @@ mod tests {
         assert!(
             lexer
                 .next()
-                .is_some_and(|v| matches!(v.kind, TokenKind::BangEqual))
+                .is_some_and(|v| matches!(v.kind, TokenKind::BangEq))
         );
     }
 
