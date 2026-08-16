@@ -1,10 +1,8 @@
 #![allow(unused_variables)]
-use codecrafters_interpreter::lexer::Keyword;
-use codecrafters_interpreter::lexer::Lexer;
-use codecrafters_interpreter::lexer::Literal;
-use codecrafters_interpreter::lexer::Token;
-use codecrafters_interpreter::lexer::TokenKind;
-use codecrafters_interpreter::parser_pratt::Parser;
+use codecrafters_interpreter::{
+    lexer::{Keyword, Lexer, Literal, Token, TokenKind},
+    parser_pratt_v2::Parser,
+};
 use std::env;
 use std::fs;
 
