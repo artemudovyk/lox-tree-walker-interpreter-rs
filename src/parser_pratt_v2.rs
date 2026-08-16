@@ -83,6 +83,7 @@ pub enum Op {
     Greater,
     GreaterEq,
     EqEq,
+    NotEq,
 }
 
 impl std::fmt::Display for Op {
@@ -99,6 +100,7 @@ impl std::fmt::Display for Op {
             Self::Greater => write!(f, ">"),
             Self::GreaterEq => write!(f, ">="),
             Self::EqEq => write!(f, "=="),
+            Self::NotEq => write!(f, "!="),
         }
     }
 }
@@ -106,9 +108,12 @@ impl std::fmt::Display for Op {
 impl Op {
     fn infix_bp(&self) -> Option<(u8, u8)> {
         match self {
-            Self::Less | Self::LessEq | Self::Greater | Self::GreaterEq | Self::EqEq => {
-                Some((1, 2))
-            }
+            Self::Less
+            | Self::LessEq
+            | Self::Greater
+            | Self::GreaterEq
+            | Self::EqEq
+            | Self::NotEq => Some((1, 2)),
             Self::Add | Self::Minus => Some((3, 4)),
             Self::Mult | Self::Div => Some((5, 6)),
             _ => None,
@@ -139,6 +144,7 @@ impl<'src> TryFrom<&Token<'src>> for Op {
             TokenKind::Greater => Ok(Op::Greater),
             TokenKind::GreaterEqual => Ok(Op::GreaterEq),
             TokenKind::EqEq => Ok(Op::EqEq),
+            TokenKind::BangEq => Ok(Op::NotEq),
             _ => Err(()),
         }
     }
@@ -367,9 +373,16 @@ mod tests {
     }
 
     #[test]
-    fn equality() {
+    fn equal() {
         let mut parser = Parser::new("83 == 99");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(== 83.0 99.0)");
+    }
+
+    #[test]
+    fn not_equal() {
+        let mut parser = Parser::new("83 != 99");
+        let expr = parser.next_expr();
+        assert_eq!(format!("{expr}"), "(!= 83.0 99.0)");
     }
 }
