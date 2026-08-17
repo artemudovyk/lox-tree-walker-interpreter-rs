@@ -53,7 +53,13 @@ impl<'src> TryFrom<&Token<'src>> for Atom<'src> {
     fn try_from(value: &Token<'src>) -> Result<Self, Self::Error> {
         match value.kind {
             TokenKind::Literal(Literal::Number(n)) => Ok(Atom::Number(n)),
-            TokenKind::Literal(Literal::String { s, .. }) => Ok(Atom::String(s)),
+            TokenKind::Literal(Literal::String { s, terminated }) => {
+                if terminated {
+                    Ok(Atom::String(s))
+                } else {
+                    Err(())
+                }
+            }
             TokenKind::Keyword(Keyword::True) => Ok(Atom::Bool(true)),
             TokenKind::Keyword(Keyword::False) => Ok(Atom::Bool(false)),
             TokenKind::Keyword(Keyword::Nil) => Ok(Atom::Nil),
@@ -164,6 +170,8 @@ pub enum ParseError {
     UnexpectedToken { line: usize, lexeme: String },
     #[error("[line {line}] Error at '{lexeme}'. Expect ')'.")]
     UnmatchedParen { line: usize, lexeme: String },
+    #[error("[line {line}] Error at '{lexeme}'. Unterminated string.")]
+    UnterminatedString { line: usize, lexeme: String },
 }
 
 pub struct Parser<'src> {
@@ -188,6 +196,11 @@ impl<'src> Parser<'src> {
             let token = self.lexer.next_token();
             if let Ok(atom) = Atom::try_from(&token) {
                 Expr::Atom(atom)
+            } else if token.unterminated() {
+                return Err(ParseError::UnterminatedString {
+                    line: token.line,
+                    lexeme: token.lexeme.to_owned(),
+                });
             } else if matches!(token.kind, TokenKind::LeftParen) {
                 let members = self.expr_bp(0)?;
                 {
@@ -417,7 +430,6 @@ mod tests {
     }
 
     #[test]
-    // #[should_panic(expected = "Unmatched parentheses at line 1")]
     fn error_at_unmatched_paren() {
         let mut parser = Parser::new("(72 + 15");
         let res = parser.next_expr();
@@ -426,6 +438,19 @@ mod tests {
             Err(ParseError::UnmatchedParen {
                 line: 1,
                 lexeme: "".to_owned()
+            })
+        )
+    }
+
+    #[test]
+    fn error_on_unterminated_string() {
+        let mut parser = Parser::new("\"hello");
+        let res = parser.next_expr();
+        assert_eq!(
+            res,
+            Err(ParseError::UnterminatedString {
+                line: 1,
+                lexeme: "\"hello".to_owned()
             })
         )
     }
