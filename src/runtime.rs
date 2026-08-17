@@ -67,6 +67,7 @@ impl<'src> Expr<'src> {
                     [arg] => match arg.evaluate()? {
                         Value::Bool(b) => Ok(Value::Bool(!b)),
                         Value::Number(n) => Ok(Value::Bool(n == 0.0)),
+                        Value::Nil => Ok(Value::Bool(true)),
                         _ => Err(RuntimeError::TypeMismatch),
                     },
                     _ => Err(RuntimeError::TypeMismatch)?,
@@ -173,6 +174,14 @@ mod tests {
     #[test]
     fn grouped_bool_negation_produces_false() {
         let mut parser = Parser::new("!((false))");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn nil_bang_negation_produces_true() {
+        let mut parser = Parser::new("!nil");
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Bool(true));
