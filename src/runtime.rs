@@ -25,13 +25,7 @@ impl<'src> From<&Atom<'src>> for Value<'src> {
 impl<'src> std::fmt::Display for Value<'src> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Number(n) => {
-                if *n == n.trunc() {
-                    write!(f, "{:.1}", n)
-                } else {
-                    write!(f, "{}", n)
-                }
-            }
+            Self::Number(n) => write!(f, "{}", n),
             Self::String(s) => write!(f, "{}", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
@@ -95,5 +89,13 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::String("hello world"));
+    }
+
+    #[test]
+    fn number() {
+        let mut parser = Parser::new("85");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(85.0));
     }
 }
