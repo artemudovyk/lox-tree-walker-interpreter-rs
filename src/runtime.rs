@@ -1,7 +1,10 @@
 use crate::parser::{Atom, Expr, Op};
 
 #[derive(Debug, thiserror::Error)]
-pub enum RuntimeError {}
+pub enum RuntimeError {
+    #[error("type mismatch")]
+    TypeMismatch,
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value<'src> {
@@ -38,16 +41,17 @@ impl<'src> Expr<'src> {
         match self {
             Self::Atom(atom) => Ok(Value::from(atom)),
             Self::Cons(op, args) => match op {
-                Op::Add => {
-                    let mut acc = 0.0;
-                    for arg in args.iter().map(|a| a.evaluate()) {
-                        match arg? {
-                            Value::Number(n) => acc += n,
-                            _ => panic!("unexpected value"),
-                        }
-                    }
-                    Ok(Value::Number(acc))
-                }
+                Op::Add => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
+                        _ => Err(RuntimeError::TypeMismatch)?,
+                    },
+                    _ => Err(RuntimeError::TypeMismatch)?,
+                },
+                Op::Group => match args.as_slice() {
+                    [arg] => arg.evaluate(),
+                    _ => Err(RuntimeError::TypeMismatch)?,
+                },
                 _ => panic!("unimplemented operation"),
             },
         }
@@ -97,5 +101,13 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Number(85.0));
+    }
+
+    #[test]
+    fn group() {
+        let mut parser = Parser::new("(\"hello world\")");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::String("hello world"));
     }
 }
