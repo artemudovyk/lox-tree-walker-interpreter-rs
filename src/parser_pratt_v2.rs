@@ -184,7 +184,8 @@ impl<'src> Parser<'src> {
                 let members = self.expr_bp(0);
                 assert!(
                     matches!(self.lexer.next_token().kind, TokenKind::RightParen),
-                    "unterminated group"
+                    "Unmatched parentheses at line {}",
+                    token.line,
                 );
                 Expr::Cons(Op::Group, vec![members])
             } else if let Ok(op) = Op::try_from(&token)
@@ -193,7 +194,10 @@ impl<'src> Parser<'src> {
                 let rhs = self.expr_bp(bp);
                 Expr::Cons(op, vec![rhs])
             } else {
-                panic!("no lhs")
+                panic!(
+                    "[line {}] Error at '{}'. Expect expression.",
+                    token.line, token.lexeme
+                );
             }
         };
 
@@ -384,5 +388,19 @@ mod tests {
         let mut parser = Parser::new("83 != 99");
         let expr = parser.next_expr();
         assert_eq!(format!("{expr}"), "(!= 83.0 99.0)");
+    }
+
+    #[test]
+    #[should_panic(expected = "[line 1] Error at ')'. Expect expression.")]
+    fn panics_at_unexpected_token() {
+        let mut parser = Parser::new("(72 +)");
+        let _ = parser.next_expr();
+    }
+
+    #[test]
+    #[should_panic(expected = "Unmatched parentheses at line 1")]
+    fn panics_at_unmatched_paren() {
+        let mut parser = Parser::new("(72 + 15");
+        let _ = parser.next_expr();
     }
 }
