@@ -88,4 +88,12 @@ mod tests {
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Nil);
     }
+
+    #[test]
+    fn string() {
+        let mut parser = Parser::new("\"hello world\"");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::String("hello world"));
+    }
 }
