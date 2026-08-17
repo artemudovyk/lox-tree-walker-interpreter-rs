@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::parser::{Atom, Expr, Op};
 
 #[derive(Debug, thiserror::Error)]
@@ -9,7 +11,7 @@ pub enum RuntimeError {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value<'src> {
     Number(f64),
-    String(&'src str),
+    String(Cow<'src, str>),
     Bool(bool),
     Nil,
 }
@@ -18,7 +20,7 @@ impl<'src> From<&Atom<'src>> for Value<'src> {
     fn from(value: &Atom<'src>) -> Self {
         match value {
             Atom::Number(n) => Value::Number(*n),
-            Atom::String(s) => Value::String(s),
+            Atom::String(s) => Value::String(Cow::Borrowed(s)),
             Atom::Bool(b) => Value::Bool(*b),
             Atom::Nil => Value::Nil,
         }
@@ -44,6 +46,9 @@ impl<'src> Expr<'src> {
                 Op::Add => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
+                        (Value::String(l), Value::String(r)) => {
+                            Ok(Value::String(Cow::Owned(format!("{l}{r}"))))
+                        }
                         _ => Err(RuntimeError::TypeMismatch)?,
                     },
                     _ => Err(RuntimeError::TypeMismatch)?,
@@ -126,7 +131,7 @@ mod tests {
         let mut parser = Parser::new("\"hello world\"");
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
-        assert_eq!(value, Value::String("hello world"));
+        assert_eq!(value, Value::String(Cow::Borrowed("hello world")));
     }
 
     #[test]
@@ -142,7 +147,7 @@ mod tests {
         let mut parser = Parser::new("(\"hello world\")");
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
-        assert_eq!(value, Value::String("hello world"));
+        assert_eq!(value, Value::String(Cow::Borrowed("hello world")));
     }
 
     #[test]
@@ -223,5 +228,13 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Number(3.0));
+    }
+
+    #[test]
+    fn string_concat() {
+        let mut parser = Parser::new("\"hello\" + \" world\"");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::String(Cow::Borrowed("hello world")));
     }
 }
