@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Expr<'src> {
     Atom(Atom<'src>),
     Cons(Op, Vec<Expr<'src>>),
@@ -22,7 +22,7 @@ impl<'src> std::fmt::Display for Expr<'src> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Atom<'src> {
     Number(f64),
     String(&'src str),
@@ -70,7 +70,7 @@ impl<'src> TryFrom<Token<'src>> for Atom<'src> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Op {
     Add,
     Mult,
@@ -158,6 +158,14 @@ impl<'src> TryFrom<Token<'src>> for Op {
     }
 }
 
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum ParseError {
+    #[error("[line {line}] Error at '{lexeme}'. Expect expression.")]
+    UnexpectedToken { line: usize, lexeme: String },
+    #[error("[line {line}] Error at '{lexeme}'. Expect ')'.")]
+    UnmatchedParen { line: usize, lexeme: String },
+}
+
 pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
@@ -171,33 +179,37 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn next_expr(&mut self) -> Expr<'src> {
+    pub fn next_expr(&mut self) -> Result<Expr<'src>, ParseError> {
         self.expr_bp(0)
     }
 
-    pub fn expr_bp(&mut self, min_bp: u8) -> Expr<'src> {
+    pub fn expr_bp(&mut self, min_bp: u8) -> Result<Expr<'src>, ParseError> {
         let mut lhs = {
             let token = self.lexer.next_token();
             if let Ok(atom) = Atom::try_from(&token) {
                 Expr::Atom(atom)
             } else if matches!(token.kind, TokenKind::LeftParen) {
-                let members = self.expr_bp(0);
-                assert!(
-                    matches!(self.lexer.next_token().kind, TokenKind::RightParen),
-                    "Unmatched parentheses at line {}",
-                    token.line,
-                );
+                let members = self.expr_bp(0)?;
+                {
+                    let t = self.lexer.next_token();
+                    if !matches!(t.kind, TokenKind::RightParen) {
+                        return Err(ParseError::UnmatchedParen {
+                            line: t.line,
+                            lexeme: t.lexeme.to_owned(),
+                        });
+                    }
+                }
                 Expr::Cons(Op::Group, vec![members])
             } else if let Ok(op) = Op::try_from(&token)
                 && let Some(bp) = op.prefix_bp()
             {
-                let rhs = self.expr_bp(bp);
+                let rhs = self.expr_bp(bp)?;
                 Expr::Cons(op, vec![rhs])
             } else {
-                panic!(
-                    "[line {}] Error at '{}'. Expect expression.",
-                    token.line, token.lexeme
-                );
+                return Err(ParseError::UnexpectedToken {
+                    line: token.line,
+                    lexeme: token.lexeme.to_owned(),
+                });
             }
         };
 
@@ -213,7 +225,7 @@ impl<'src> Parser<'src> {
                     break;
                 }
                 self.lexer.advance();
-                let rhs = self.expr_bp(r_bp);
+                let rhs = self.expr_bp(r_bp)?;
                 // What is built so far
                 lhs = Expr::Cons(op, vec![lhs, rhs]);
                 // Continue to check the next operator
@@ -228,7 +240,7 @@ impl<'src> Parser<'src> {
         // Return what was built so far as lhs: if nothing was built in a loop above, then it will
         // be an atom found at the beginning of the function. Otherwise it will be constructed
         // expression for this subtree bound by binding power.
-        lhs
+        Ok(lhs)
     }
 }
 
@@ -239,109 +251,109 @@ mod tests {
     #[test]
     fn add() {
         let mut parser = Parser::new("2 + 3");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(+ 2.0 3.0)");
     }
 
     #[test]
     fn add_mult() {
         let mut parser = Parser::new("2 + 3 * 4");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(+ 2.0 (* 3.0 4.0))");
     }
 
     #[test]
     fn add_mult_add() {
         let mut parser = Parser::new("2 + 3 * 4 + 5");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(+ (+ 2.0 (* 3.0 4.0)) 5.0)");
     }
 
     #[test]
     fn k_true() {
         let mut parser = Parser::new("true");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "true");
     }
 
     #[test]
     fn k_false() {
         let mut parser = Parser::new("false");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "false");
     }
 
     #[test]
     fn nil() {
         let mut parser = Parser::new("nil");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "nil");
     }
 
     #[test]
     fn number() {
         let mut parser = Parser::new("42.47");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "42.47");
 
         let mut parser = Parser::new("42");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "42.0");
     }
 
     #[test]
     fn zero() {
         let mut parser = Parser::new("0.0");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "0.0");
     }
 
     #[test]
     fn string() {
         let mut parser = Parser::new("\"hello\"");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "hello");
     }
 
     #[test]
     fn group_single_member() {
         let mut parser = Parser::new("(15)");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(group 15.0)");
     }
 
     #[test]
     fn group_multiple_members() {
         let mut parser = Parser::new("(10.1 + 21.2)");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(group (+ 10.1 21.2))");
     }
 
     #[test]
     fn bang_bool() {
         let mut parser = Parser::new("!true");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(! true)");
     }
 
     #[test]
     fn minus_number() {
         let mut parser = Parser::new("-70");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(- 70.0)");
     }
 
     #[test]
     fn mult_div() {
         let mut parser = Parser::new("16 * 38 / 58");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(/ (* 16.0 38.0) 58.0)");
     }
 
     #[test]
     fn mix_expression() {
         let mut parser = Parser::new("(82 * -27 / (34 * 66))");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(
             format!("{expr}"),
             "(group (/ (* 82.0 (- 27.0)) (group (* 34.0 66.0))))"
@@ -351,56 +363,70 @@ mod tests {
     #[test]
     fn less() {
         let mut parser = Parser::new("83 < 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(< 83.0 99.0)");
     }
 
     #[test]
     fn less_eq() {
         let mut parser = Parser::new("83 <= 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(<= 83.0 99.0)");
     }
 
     #[test]
     fn greater() {
         let mut parser = Parser::new("83 > 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(> 83.0 99.0)");
     }
 
     #[test]
     fn greater_eq() {
         let mut parser = Parser::new("83 >= 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(>= 83.0 99.0)");
     }
 
     #[test]
     fn equal() {
         let mut parser = Parser::new("83 == 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(== 83.0 99.0)");
     }
 
     #[test]
     fn not_equal() {
         let mut parser = Parser::new("83 != 99");
-        let expr = parser.next_expr();
+        let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(!= 83.0 99.0)");
     }
 
     #[test]
-    #[should_panic(expected = "[line 1] Error at ')'. Expect expression.")]
-    fn panics_at_unexpected_token() {
+    // #[should_panic(expected = "[line 1] Error at ')'. Expect expression.")]
+    fn error_at_unexpected_token() {
         let mut parser = Parser::new("(72 +)");
-        let _ = parser.next_expr();
+        let res = parser.next_expr();
+        assert_eq!(
+            res,
+            Err(ParseError::UnexpectedToken {
+                line: 1,
+                lexeme: ")".to_owned()
+            })
+        )
     }
 
     #[test]
-    #[should_panic(expected = "Unmatched parentheses at line 1")]
-    fn panics_at_unmatched_paren() {
+    // #[should_panic(expected = "Unmatched parentheses at line 1")]
+    fn error_at_unmatched_paren() {
         let mut parser = Parser::new("(72 + 15");
-        let _ = parser.next_expr();
+        let res = parser.next_expr();
+        assert_eq!(
+            res,
+            Err(ParseError::UnmatchedParen {
+                line: 1,
+                lexeme: "".to_owned()
+            })
+        )
     }
 }

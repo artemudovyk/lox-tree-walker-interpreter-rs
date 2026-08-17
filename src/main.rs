@@ -44,7 +44,13 @@ fn main() {
                 String::new()
             });
             let mut parser = Parser::new(&file_contents);
-            let expr = parser.next_expr();
+            let expr = match parser.next_expr() {
+                Ok(v) => v,
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(65)
+                }
+            };
             println!("{expr}");
         }
         _ => {
