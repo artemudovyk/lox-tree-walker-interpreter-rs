@@ -63,6 +63,20 @@ impl<'src> Expr<'src> {
                     },
                     _ => Err(RuntimeError::TypeMismatch),
                 },
+                Op::Div => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::Mult => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
                 Op::Bang => match args.as_slice() {
                     [arg] => match arg.evaluate()? {
                         Value::Bool(b) => Ok(Value::Bool(!b)),
@@ -185,5 +199,29 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn division() {
+        let mut parser = Parser::new("42 / 5");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(8.4));
+    }
+
+    #[test]
+    fn multiplication() {
+        let mut parser = Parser::new("10 * 3");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(30.0));
+    }
+
+    #[test]
+    fn mixed_mult_div() {
+        let mut parser = Parser::new("(18 * 3 / (3 * 6))");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(3.0));
     }
 }
