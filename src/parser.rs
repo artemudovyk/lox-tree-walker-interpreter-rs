@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
     Atom(Atom<'src>),
     Cons(Op, Vec<Expr<'src>>),
@@ -22,7 +22,7 @@ impl<'src> std::fmt::Display for Expr<'src> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Atom<'src> {
     Number(f64),
     String(&'src str),
@@ -76,7 +76,7 @@ impl<'src> TryFrom<Token<'src>> for Atom<'src> {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Op {
     Add,
     Mult,

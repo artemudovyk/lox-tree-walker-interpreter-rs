@@ -1,7 +1,7 @@
 #![allow(unused_variables)]
 use codecrafters_interpreter::{
     lexer::{Keyword, Lexer, Literal, Token, TokenKind},
-    parser_pratt_v2::Parser,
+    parser::Parser,
 };
 use std::env;
 use std::fs;
@@ -52,6 +52,21 @@ fn main() {
                 }
             };
             println!("{expr}");
+        }
+        "evaluate" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                eprintln!("Failed to read file {}", filename);
+                String::new()
+            });
+            let mut parser = Parser::new(&file_contents);
+            let value = match parser.next_expr() {
+                Ok(v) => v.evaluate().unwrap(),
+                Err(e) => {
+                    eprintln!("{e}");
+                    std::process::exit(65)
+                }
+            };
+            println!("{value}");
         }
         _ => {
             eprintln!("Unknown command: {}", command);
