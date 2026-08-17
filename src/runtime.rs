@@ -91,6 +91,34 @@ impl<'src> Expr<'src> {
                     },
                     _ => Err(RuntimeError::TypeMismatch)?,
                 },
+                Op::Less => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l < r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::LessEq => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l <= r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::Greater => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l > r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::GreaterEq => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l >= r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
                 _ => panic!("unimplemented operation"),
             },
         }
@@ -236,5 +264,37 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::String(Cow::Borrowed("hello world")));
+    }
+
+    #[test]
+    fn less_produces_true_for_lower_left_value() {
+        let mut parser = Parser::new("7 < 10");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn less_eq_produces_true_for_same_values() {
+        let mut parser = Parser::new("7 <= 7");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn greater_produces_true_for_greater_left_value() {
+        let mut parser = Parser::new("11 > 5");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn greater_eq_produces_true_for_same_values() {
+        let mut parser = Parser::new("7 >= 7");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
     }
 }
