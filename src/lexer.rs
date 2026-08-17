@@ -110,10 +110,7 @@ impl<'src> Token<'src> {
 
     pub fn unterminated(&self) -> bool {
         match &self.kind {
-            TokenKind::Literal(literal) => match literal {
-                Literal::String { terminated, .. } => !terminated,
-                _ => false,
-            },
+            TokenKind::Literal(Literal::String { terminated, .. }) => !*terminated,
             _ => false,
         }
     }
