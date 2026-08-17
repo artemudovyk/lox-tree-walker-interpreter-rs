@@ -52,6 +52,25 @@ impl<'src> Expr<'src> {
                     [arg] => arg.evaluate(),
                     _ => Err(RuntimeError::TypeMismatch)?,
                 },
+                Op::Minus => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    [arg] => match arg.evaluate()? {
+                        Value::Number(n) => Ok(Value::Number(-n)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::Bang => match args.as_slice() {
+                    [arg] => match arg.evaluate()? {
+                        Value::Bool(b) => Ok(Value::Bool(!b)),
+                        Value::Number(n) => Ok(Value::Bool(n == 0.0)),
+                        _ => Err(RuntimeError::TypeMismatch),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch)?,
+                },
                 _ => panic!("unimplemented operation"),
             },
         }
@@ -109,5 +128,53 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::String("hello world"));
+    }
+
+    #[test]
+    fn number_minus_negation_produces_negative_number() {
+        let mut parser = Parser::new("-73");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(-73.0));
+    }
+
+    #[test]
+    fn sub() {
+        let mut parser = Parser::new("84 - 73");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Number(11.0));
+    }
+
+    #[test]
+    fn bool_negation_produces_false() {
+        let mut parser = Parser::new("!true");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(false));
+    }
+
+    #[test]
+    fn non_zero_number_bang_negation_produces_false() {
+        let mut parser = Parser::new("!73");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(false));
+    }
+
+    #[test]
+    fn zero_number_bang_negation_produces_true() {
+        let mut parser = Parser::new("!0");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
+    }
+
+    #[test]
+    fn grouped_bool_negation_produces_false() {
+        let mut parser = Parser::new("!((false))");
+        let expr = parser.next_expr().unwrap();
+        let value = expr.evaluate().unwrap();
+        assert_eq!(value, Value::Bool(true));
     }
 }
