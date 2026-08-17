@@ -119,7 +119,24 @@ impl<'src> Expr<'src> {
                     },
                     _ => Err(RuntimeError::TypeMismatch),
                 },
-                _ => panic!("unimplemented operation"),
+                Op::EqEq => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l == r)),
+                        (Value::String(l), Value::String(r)) => Ok(Value::Bool(l == r)),
+                        (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l == r)),
+                        _ => Ok(Value::Bool(false)),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
+                Op::NotEq => match args.as_slice() {
+                    [left, right] => match (left.evaluate()?, right.evaluate()?) {
+                        (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l != r)),
+                        (Value::String(l), Value::String(r)) => Ok(Value::Bool(l != r)),
+                        (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l != r)),
+                        _ => Ok(Value::Bool(true)),
+                    },
+                    _ => Err(RuntimeError::TypeMismatch),
+                },
             },
         }
     }
@@ -296,5 +313,125 @@ mod tests {
         let expr = parser.next_expr().unwrap();
         let value = expr.evaluate().unwrap();
         assert_eq!(value, Value::Bool(true));
+    }
+
+    mod equality {
+        use super::*;
+
+        #[test]
+        fn produces_true_for_same_numbers() {
+            let mut parser = Parser::new("7 == 7");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_false_for_different_numbers() {
+            let mut parser = Parser::new("7 == 8");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_true_for_same_strings() {
+            let mut parser = Parser::new("\"hello\" == \"hello\"");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_false_for_different_strings() {
+            let mut parser = Parser::new("\"hello\" == \"world\"");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_false_for_different_types() {
+            let mut parser = Parser::new("\"hello\" == 1");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_true_when_both_are_true() {
+            let mut parser = Parser::new("true == true");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_false_for_different_bools() {
+            let mut parser = Parser::new("true == false");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+    }
+
+    mod inequality {
+        use super::*;
+
+        #[test]
+        fn produces_false_for_same_numbers() {
+            let mut parser = Parser::new("7 != 7");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_true_for_different_numbers() {
+            let mut parser = Parser::new("7 != 8");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_false_for_same_strings() {
+            let mut parser = Parser::new("\"hello\" != \"hello\"");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_true_for_different_strings() {
+            let mut parser = Parser::new("\"hello\" != \"world\"");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_true_for_different_types() {
+            let mut parser = Parser::new("\"hello\" != 1");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn produces_false_when_both_are_true() {
+            let mut parser = Parser::new("true != true");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn produces_true_for_different_bools() {
+            let mut parser = Parser::new("true != false");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
     }
 }
