@@ -84,22 +84,22 @@ impl<'src> Expr<'src> {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
                         _ => Err(RuntimeError::TypeMismatch(
-                            "Unsupported operand types for this operation.".to_owned(),
+                            "Operands must be numbers.".to_owned(),
                         ))?,
                     },
                     _ => Err(RuntimeError::TypeMismatch(
-                        "Unsupported operand types for this operation.".to_owned(),
+                        "Operands must be numbers.".to_owned(),
                     ))?,
                 },
                 Op::Mult => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
                         _ => Err(RuntimeError::TypeMismatch(
-                            "Unsupported operand types for this operation.".to_owned(),
+                            "Operands must be numbers.".to_owned(),
                         ))?,
                     },
                     _ => Err(RuntimeError::TypeMismatch(
-                        "Unsupported operand types for this operation.".to_owned(),
+                        "Operands must be numbers.".to_owned(),
                     ))?,
                 },
                 Op::Bang => match args.as_slice() {
