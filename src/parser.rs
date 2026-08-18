@@ -193,16 +193,19 @@ impl<'src> Parser<'src> {
     }
 
     pub fn next_stmt(&mut self) -> Result<Stmt<'src>, ParseError> {
-        let token = self.lexer.peek();
         loop {
-            match token.kind {
+            match self.lexer.peek().kind {
                 TokenKind::Keyword(Keyword::Print) => {
                     // Consume keyword
                     self.lexer.advance();
                     let expr = self.next_expr()?;
                     return Ok(Stmt::Print(expr));
                 }
-                TokenKind::Comment => continue,
+                // Consume and ignore comments
+                TokenKind::Comment => {
+                    self.lexer.advance();
+                    continue;
+                }
                 // Fallback to expression statement;
                 _ => {
                     let expr = self.expr_bp(0)?;
