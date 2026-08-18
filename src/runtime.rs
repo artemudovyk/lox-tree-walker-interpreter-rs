@@ -1,10 +1,38 @@
-use crate::parser::{Atom, Expr, Op, Stmt};
-use std::borrow::Cow;
+use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
+use std::{borrow::Cow, io::Write};
+
+pub struct Runtime<W: Write> {
+    out: W,
+}
+
+impl<W: Write> Runtime<W> {
+    pub fn with_out(writer: W) -> Self {
+        Self { out: writer }
+    }
+
+    pub fn run(&mut self, src: &str) -> Result<(), RuntimeError> {
+        let mut parser = Parser::new(src);
+        while let Some(stmt) = parser.next_stmt()? {
+            stmt.execute(&mut self.out)?;
+        }
+        Ok(())
+    }
+}
+
+impl Default for Runtime<std::io::Stdout> {
+    fn default() -> Self {
+        Self {
+            out: std::io::stdout(),
+        }
+    }
+}
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
     #[error("{0}")]
     TypeMismatch(String),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -186,10 +214,10 @@ impl<'src> Expr<'src> {
 }
 
 impl<'src> Stmt<'src> {
-    pub fn run(&self) -> Result<(), RuntimeError> {
+    pub fn execute(&self, out: &mut impl Write) -> Result<(), RuntimeError> {
         match self {
             Self::Print(expr) => {
-                println!("{}", expr.evaluate()?)
+                let _ = writeln!(out, "{}", expr.evaluate()?);
             }
             _ => todo!(),
         }
@@ -521,9 +549,34 @@ mod tests {
     }
 
     mod statements {
-        // #[test]
-        // fn print_statements_prints_to_stdout() {
-        //
-        // }
+        use super::*;
+
+        #[test]
+        fn print_statements_writes_to_out() {
+            let cases = [
+                ("print true;", "true\n"),
+                ("print \"world\" + \"baz\" + \"bar\";", "worldbazbar\n"),
+                ("print 27 - 26;", "1\n"),
+                ("print \"bar\" == \"quz\";", "false\n"),
+                ("print \"hello\"; print true;", "hello\ntrue\n"),
+            ];
+
+            for (src, expected) in cases {
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, expected, "unexpected output for: {src}");
+            }
+        }
+
+        #[test]
+        fn print_statement_can_print_multiline_string() {
+            let mut buf = Vec::new();
+            let mut runtime = Runtime::with_out(&mut buf);
+            runtime.run("print \"a\nb\nc\n\";").unwrap();
+            let actual = std::str::from_utf8(&buf).unwrap();
+            assert_eq!(actual, "a\nb\nc\n\n");
+        }
     }
 }

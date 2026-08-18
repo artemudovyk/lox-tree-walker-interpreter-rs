@@ -192,28 +192,34 @@ impl<'src> Parser<'src> {
         }
     }
 
-    pub fn next_stmt(&mut self) -> Result<Stmt<'src>, ParseError> {
+    fn assert_semicolon(&mut self) {
+        assert!(
+            matches!(self.lexer.next_token().kind, TokenKind::Semicolon),
+            "Expect ';' at the end of the statement."
+        );
+    }
+
+    pub fn next_stmt(&mut self) -> Result<Option<Stmt<'src>>, ParseError> {
         loop {
             match self.lexer.peek().kind {
                 TokenKind::Keyword(Keyword::Print) => {
                     // Consume keyword
                     self.lexer.advance();
                     let expr = self.next_expr()?;
-                    return Ok(Stmt::Print(expr));
+                    self.assert_semicolon();
+                    return Ok(Some(Stmt::Print(expr)));
                 }
                 // Consume and ignore comments
                 TokenKind::Comment => {
                     self.lexer.advance();
                     continue;
                 }
+                TokenKind::Eof => return Ok(None),
                 // Fallback to expression statement;
                 _ => {
                     let expr = self.expr_bp(0)?;
-                    assert!(
-                        matches!(self.lexer.next_token().kind, TokenKind::Semicolon),
-                        "Expect ';' at the end of the statement."
-                    );
-                    return Ok(Stmt::Expr(expr));
+                    self.assert_semicolon();
+                    return Ok(Some(Stmt::Expr(expr)));
                 }
             }
         }
@@ -266,7 +272,6 @@ impl<'src> Parser<'src> {
                 // If the next operator's left binding power is less than minimum, it is not strong
                 // enough to bind the next atom, so we break and return lhs we've built so far
                 if l_bp < min_bp {
-                    eprintln!("lbp {l_bp} < min_bp {min_bp}");
                     break;
                 }
                 self.lexer.advance();
@@ -498,7 +503,10 @@ mod tests {
         fn parses_print_statement() {
             let mut parser = Parser::new("print \"hello world\";");
             let res = parser.next_stmt().unwrap();
-            assert_eq!(res, Stmt::Print(Expr::Atom(Atom::String("hello world"))),)
+            assert_eq!(
+                res,
+                Some(Stmt::Print(Expr::Atom(Atom::String("hello world"))))
+            )
         }
     }
 }

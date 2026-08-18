@@ -238,9 +238,8 @@ impl<'src> Lexer<'src> {
                 _ => TokenKind::Slash,
             },
             '"' => {
-                self.cursor
-                    .eat_while(|v| v != '"' && v != '\n' && v != EOF_CHAR);
-                if self.cursor.peek() == EOF_CHAR || self.cursor.peek() == '\n' {
+                self.cursor.eat_while(|v| v != '"' && v != EOF_CHAR);
+                if self.cursor.peek() == EOF_CHAR {
                     TokenKind::Literal(Literal::String {
                         s: "",
                         terminated: false,

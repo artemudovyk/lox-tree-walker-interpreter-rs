@@ -2,6 +2,7 @@
 use codecrafters_interpreter::{
     lexer::{Keyword, Lexer, Literal, Token, TokenKind},
     parser::Parser,
+    runtime::{Runtime, RuntimeError},
 };
 use std::env;
 use std::fs;
@@ -80,21 +81,36 @@ fn main() {
                 eprintln!("Failed to read file {}", filename);
                 String::new()
             });
-            let mut parser = Parser::new(&file_contents);
-            match parser.next_stmt() {
-                Ok(stmt) => match stmt.run() {
-                    Ok(_) => {}
-                    Err(runtime_error) => {
-                        eprintln!("{runtime_error}");
-                        eprintln!("[line {}]", parser.current_line());
-                        std::process::exit(70);
-                    }
-                },
-                Err(parse_error) => {
+            let mut runtime = Runtime::default();
+
+            match runtime.run(&file_contents) {
+                Ok(_) => {}
+                Err(RuntimeError::ParseError(parse_error)) => {
                     eprintln!("{parse_error}");
                     std::process::exit(65);
                 }
-            };
+                Err(runtime_error) => {
+                    eprintln!("{runtime_error}");
+                    // TODO: change later
+                    eprintln!("[line 1]");
+                    // eprintln!("[line {}]", parser.current_line());
+                    std::process::exit(70);
+                }
+            }
+            // match parser.next_stmt() {
+            //     Ok(Some(stmt)) => match stmt.execute() {
+            //         Ok(_) => {}
+            //         Err(runtime_error) => {
+            //             eprintln!("{runtime_error}");
+            //             eprintln!("[line {}]", parser.current_line());
+            //             std::process::exit(70);
+            //         }
+            //     },
+            //     Err(parse_error) => {
+            //         eprintln!("{parse_error}");
+            //         std::process::exit(65);
+            //     }
+            // };
         }
         _ => {
             eprintln!("Unknown command: {}", command);
