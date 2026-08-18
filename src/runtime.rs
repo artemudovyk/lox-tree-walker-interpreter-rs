@@ -219,7 +219,9 @@ impl<'src> Stmt<'src> {
             Self::Print(expr) => {
                 let _ = writeln!(out, "{}", expr.evaluate()?);
             }
-            Self::Expr(_) => {}
+            Self::Expr(e) => {
+                e.evaluate()?;
+            }
         }
         Ok(())
     }
