@@ -255,6 +255,10 @@ impl<'src> Parser<'src> {
         // expression for this subtree bound by binding power.
         Ok(lhs)
     }
+
+    pub fn current_line(&self) -> usize {
+        self.lexer.current_line()
+    }
 }
 
 #[cfg(test)]

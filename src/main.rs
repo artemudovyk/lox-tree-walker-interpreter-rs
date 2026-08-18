@@ -64,6 +64,7 @@ fn main() {
                     Ok(v) => v,
                     Err(runtime_error) => {
                         eprintln!("{runtime_error}");
+                        eprintln!("[line {}]", parser.current_line());
                         std::process::exit(70);
                     }
                 },

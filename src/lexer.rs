@@ -308,6 +308,10 @@ impl<'src> Lexer<'src> {
     pub fn tokenize(&mut self) -> Vec<Token<'src>> {
         self.by_ref().collect()
     }
+
+    pub fn current_line(&self) -> usize {
+        self.cursor.line
+    }
 }
 
 impl<'src> Iterator for Lexer<'src> {
