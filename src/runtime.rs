@@ -219,7 +219,7 @@ impl<'src> Stmt<'src> {
             Self::Print(expr) => {
                 let _ = writeln!(out, "{}", expr.evaluate()?);
             }
-            _ => todo!(),
+            Self::Expr(_) => {}
         }
         Ok(())
     }
