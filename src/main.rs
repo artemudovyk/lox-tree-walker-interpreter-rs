@@ -75,6 +75,27 @@ fn main() {
             };
             println!("{value}");
         }
+        "run" => {
+            let file_contents = fs::read_to_string(filename).unwrap_or_else(|_| {
+                eprintln!("Failed to read file {}", filename);
+                String::new()
+            });
+            let mut parser = Parser::new(&file_contents);
+            match parser.next_stmt() {
+                Ok(stmt) => match stmt.run() {
+                    Ok(_) => {}
+                    Err(runtime_error) => {
+                        eprintln!("{runtime_error}");
+                        eprintln!("[line {}]", parser.current_line());
+                        std::process::exit(70);
+                    }
+                },
+                Err(parse_error) => {
+                    eprintln!("{parse_error}");
+                    std::process::exit(65);
+                }
+            };
+        }
         _ => {
             eprintln!("Unknown command: {}", command);
         }

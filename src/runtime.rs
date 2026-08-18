@@ -1,6 +1,5 @@
+use crate::parser::{Atom, Expr, Op, Stmt};
 use std::borrow::Cow;
-
-use crate::parser::{Atom, Expr, Op};
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
@@ -183,6 +182,18 @@ impl<'src> Expr<'src> {
                 },
             },
         }
+    }
+}
+
+impl<'src> Stmt<'src> {
+    pub fn run(&self) -> Result<(), RuntimeError> {
+        match self {
+            Self::Print(expr) => {
+                println!("{}", expr.evaluate()?)
+            }
+            _ => todo!(),
+        }
+        Ok(())
     }
 }
 
@@ -507,5 +518,12 @@ mod tests {
             let value = expr.evaluate().unwrap();
             assert_eq!(value, Value::Bool(true));
         }
+    }
+
+    mod statements {
+        // #[test]
+        // fn print_statements_prints_to_stdout() {
+        //
+        // }
     }
 }

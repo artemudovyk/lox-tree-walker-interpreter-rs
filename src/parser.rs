@@ -2,6 +2,11 @@
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
 #[derive(Debug, Clone, PartialEq)]
+pub enum Stmt<'src> {
+    Expr(Expr<'src>),
+    Print(Expr<'src>),
+}
+#[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
     Atom(Atom<'src>),
     Cons(Op, Vec<Expr<'src>>),
@@ -184,6 +189,27 @@ impl<'src> Parser<'src> {
         Self {
             src,
             lexer: Lexer::new(src),
+        }
+    }
+
+    pub fn next_stmt(&mut self) -> Result<Stmt<'src>, ParseError> {
+        let token = self.lexer.peek();
+        match token.kind {
+            TokenKind::Keyword(Keyword::Print) => {
+                // Consume keyword
+                self.lexer.advance();
+                let expr = self.next_expr()?;
+                Ok(Stmt::Print(expr))
+            }
+            // Fallback to expression statement;
+            _ => {
+                let expr = self.expr_bp(0)?;
+                assert!(
+                    matches!(self.lexer.next_token().kind, TokenKind::Semicolon),
+                    "Expect ';' at the end of the statement."
+                );
+                Ok(Stmt::Expr(expr))
+            }
         }
     }
 
@@ -457,5 +483,16 @@ mod tests {
                 lexeme: "\"hello".to_owned()
             })
         )
+    }
+
+    mod statements {
+        use super::*;
+
+        #[test]
+        fn parses_print_statement() {
+            let mut parser = Parser::new("print \"hello world\";");
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(res, Stmt::Print(Expr::Atom(Atom::String("hello world"))),)
+        }
     }
 }
