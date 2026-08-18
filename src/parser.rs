@@ -508,5 +508,15 @@ mod tests {
                 Some(Stmt::Print(Expr::Atom(Atom::String("hello world"))))
             )
         }
+
+        #[test]
+        fn parses_expression_statement() {
+            let mut parser = Parser::new("\"hello world\";");
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Expr(Expr::Atom(Atom::String("hello world"))))
+            )
+        }
     }
 }
