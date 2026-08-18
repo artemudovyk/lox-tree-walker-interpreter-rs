@@ -60,10 +60,16 @@ fn main() {
             });
             let mut parser = Parser::new(&file_contents);
             let value = match parser.next_expr() {
-                Ok(v) => v.evaluate().unwrap(),
-                Err(e) => {
-                    eprintln!("{e}");
-                    std::process::exit(65)
+                Ok(v) => match v.evaluate() {
+                    Ok(v) => v,
+                    Err(runtime_error) => {
+                        eprintln!("{runtime_error}");
+                        std::process::exit(70);
+                    }
+                },
+                Err(parse_error) => {
+                    eprintln!("{parse_error}");
+                    std::process::exit(65);
                 }
             };
             println!("{value}");

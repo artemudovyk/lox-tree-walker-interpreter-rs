@@ -2,10 +2,10 @@ use std::borrow::Cow;
 
 use crate::parser::{Atom, Expr, Op};
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
-    #[error("type mismatch")]
-    TypeMismatch,
+    #[error("{0}")]
+    TypeMismatch(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -49,75 +49,115 @@ impl<'src> Expr<'src> {
                         (Value::String(l), Value::String(r)) => {
                             Ok(Value::String(Cow::Owned(format!("{l}{r}"))))
                         }
-                        _ => Err(RuntimeError::TypeMismatch)?,
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch)?,
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Group => match args.as_slice() {
                     [arg] => arg.evaluate(),
-                    _ => Err(RuntimeError::TypeMismatch)?,
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Minus => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
                     [arg] => match arg.evaluate()? {
                         Value::Number(n) => Ok(Value::Number(-n)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Operand must be a number".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Div => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l / r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Mult => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l * r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Bang => match args.as_slice() {
                     [arg] => match arg.evaluate()? {
                         Value::Bool(b) => Ok(Value::Bool(!b)),
                         Value::Number(n) => Ok(Value::Bool(n == 0.0)),
                         Value::Nil => Ok(Value::Bool(true)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch)?,
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Less => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l < r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::LessEq => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l <= r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::Greater => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l > r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::GreaterEq => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Bool(l >= r)),
-                        _ => Err(RuntimeError::TypeMismatch),
+                        _ => Err(RuntimeError::TypeMismatch(
+                            "Unsupported operand types for this operation.".to_owned(),
+                        ))?,
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::EqEq => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
@@ -126,7 +166,9 @@ impl<'src> Expr<'src> {
                         (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l == r)),
                         _ => Ok(Value::Bool(false)),
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
                 Op::NotEq => match args.as_slice() {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
@@ -135,7 +177,9 @@ impl<'src> Expr<'src> {
                         (Value::Bool(l), Value::Bool(r)) => Ok(Value::Bool(l != r)),
                         _ => Ok(Value::Bool(true)),
                     },
-                    _ => Err(RuntimeError::TypeMismatch),
+                    _ => Err(RuntimeError::TypeMismatch(
+                        "Unsupported operand types for this operation.".to_owned(),
+                    ))?,
                 },
             },
         }
@@ -195,12 +239,42 @@ mod tests {
         assert_eq!(value, Value::String(Cow::Borrowed("hello world")));
     }
 
-    #[test]
-    fn number_minus_negation_produces_negative_number() {
-        let mut parser = Parser::new("-73");
-        let expr = parser.next_expr().unwrap();
-        let value = expr.evaluate().unwrap();
-        assert_eq!(value, Value::Number(-73.0));
+    mod minus {
+        use super::*;
+
+        #[test]
+        fn minus_negation_number_produces_negative_number() {
+            let mut parser = Parser::new("-73");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate().unwrap();
+            assert_eq!(value, Value::Number(-73.0));
+        }
+
+        #[test]
+        fn minus_negation_string_returns_error() {
+            let mut parser = Parser::new("-\"hello world\"");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate();
+            assert_eq!(
+                value,
+                Err(RuntimeError::TypeMismatch(
+                    "Operand must be a number".to_owned()
+                ))
+            );
+        }
+
+        #[test]
+        fn minus_negation_bool_returns_error() {
+            let mut parser = Parser::new("-true");
+            let expr = parser.next_expr().unwrap();
+            let value = expr.evaluate();
+            assert_eq!(
+                value,
+                Err(RuntimeError::TypeMismatch(
+                    "Operand must be a number".to_owned()
+                ))
+            );
+        }
     }
 
     #[test]
