@@ -50,11 +50,11 @@ impl<'src> Expr<'src> {
                             Ok(Value::String(Cow::Owned(format!("{l}{r}"))))
                         }
                         _ => Err(RuntimeError::TypeMismatch(
-                            "Unsupported operand types for this operation.".to_owned(),
+                            "Operands must be numbers.".to_owned(),
                         ))?,
                     },
                     _ => Err(RuntimeError::TypeMismatch(
-                        "Unsupported operand types for this operation.".to_owned(),
+                        "Operands must be numbers.".to_owned(),
                     ))?,
                 },
                 Op::Group => match args.as_slice() {
@@ -67,7 +67,7 @@ impl<'src> Expr<'src> {
                     [left, right] => match (left.evaluate()?, right.evaluate()?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l - r)),
                         _ => Err(RuntimeError::TypeMismatch(
-                            "Unsupported operand types for this operation.".to_owned(),
+                            "Operands must be numbers.".to_owned(),
                         ))?,
                     },
                     [arg] => match arg.evaluate()? {
@@ -77,7 +77,7 @@ impl<'src> Expr<'src> {
                         ))?,
                     },
                     _ => Err(RuntimeError::TypeMismatch(
-                        "Unsupported operand types for this operation.".to_owned(),
+                        "Operands must be numbers.".to_owned(),
                     ))?,
                 },
                 Op::Div => match args.as_slice() {
