@@ -194,21 +194,24 @@ impl<'src> Parser<'src> {
 
     pub fn next_stmt(&mut self) -> Result<Stmt<'src>, ParseError> {
         let token = self.lexer.peek();
-        match token.kind {
-            TokenKind::Keyword(Keyword::Print) => {
-                // Consume keyword
-                self.lexer.advance();
-                let expr = self.next_expr()?;
-                Ok(Stmt::Print(expr))
-            }
-            // Fallback to expression statement;
-            _ => {
-                let expr = self.expr_bp(0)?;
-                assert!(
-                    matches!(self.lexer.next_token().kind, TokenKind::Semicolon),
-                    "Expect ';' at the end of the statement."
-                );
-                Ok(Stmt::Expr(expr))
+        loop {
+            match token.kind {
+                TokenKind::Keyword(Keyword::Print) => {
+                    // Consume keyword
+                    self.lexer.advance();
+                    let expr = self.next_expr()?;
+                    return Ok(Stmt::Print(expr));
+                }
+                TokenKind::Comment => continue,
+                // Fallback to expression statement;
+                _ => {
+                    let expr = self.expr_bp(0)?;
+                    assert!(
+                        matches!(self.lexer.next_token().kind, TokenKind::Semicolon),
+                        "Expect ';' at the end of the statement."
+                    );
+                    return Ok(Stmt::Expr(expr));
+                }
             }
         }
     }
