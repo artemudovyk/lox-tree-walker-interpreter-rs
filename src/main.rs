@@ -60,9 +60,10 @@ fn main() {
                 String::new()
             });
             let mut parser = Parser::new(&file_contents);
+            let mut runtime = Runtime::default();
             let value = match parser.next_expr() {
-                Ok(v) => match v.evaluate() {
-                    Ok(v) => v,
+                Ok(expr) => match runtime.eval_expr(&expr) {
+                    Ok(val) => val,
                     Err(runtime_error) => {
                         eprintln!("{runtime_error}");
                         eprintln!("[line {}]", parser.current_line());
@@ -155,7 +156,7 @@ fn print_token(t: &Token) {
                 }
             }
         },
-        TokenKind::Identifier => println!("IDENTIFIER {} null", t.lexeme),
+        TokenKind::Ident => println!("IDENTIFIER {} null", t.lexeme),
         TokenKind::Unknown { ch, line } => {
             eprintln!("[line {line}] Error: Unexpected character: {ch}")
         }

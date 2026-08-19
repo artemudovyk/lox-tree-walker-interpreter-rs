@@ -5,6 +5,10 @@ use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 pub enum Stmt<'src> {
     Expr(Expr<'src>),
     Print(Expr<'src>),
+    Var {
+        name: &'src str,
+        init_val: Expr<'src>,
+    },
 }
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
@@ -33,6 +37,7 @@ pub enum Atom<'src> {
     String(&'src str),
     Bool(bool),
     Nil,
+    Ident(&'src str),
 }
 
 impl<'src> std::fmt::Display for Atom<'src> {
@@ -48,6 +53,7 @@ impl<'src> std::fmt::Display for Atom<'src> {
             Self::String(s) => write!(f, "{}", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
+            Self::Ident(ident) => write!(f, "{}", ident),
         }
     }
 }
@@ -68,6 +74,7 @@ impl<'src> TryFrom<&Token<'src>> for Atom<'src> {
             TokenKind::Keyword(Keyword::True) => Ok(Atom::Bool(true)),
             TokenKind::Keyword(Keyword::False) => Ok(Atom::Bool(false)),
             TokenKind::Keyword(Keyword::Nil) => Ok(Atom::Nil),
+            TokenKind::Ident => Ok(Atom::Ident(value.lexeme)),
             _ => Err(()),
         }
     }
@@ -177,6 +184,10 @@ pub enum ParseError {
     UnmatchedParen { line: usize, lexeme: String },
     #[error("[line {line}] Error at '{lexeme}'. Unterminated string.")]
     UnterminatedString { line: usize, lexeme: String },
+    // TODO: somewhat collides with UnexpectedToken - think about a better name for both
+    // I want for this error message
+    #[error("{0}")]
+    ExpectedTokenNotFound(String),
 }
 
 pub struct Parser<'src> {
@@ -199,15 +210,36 @@ impl<'src> Parser<'src> {
         );
     }
 
+    fn expect_token(&mut self, token_kind: TokenKind<'src>) -> Result<Token<'src>, ParseError> {
+        let token = self.lexer.next_token();
+        if token.kind != token_kind {
+            return Err(ParseError::ExpectedTokenNotFound(format!(
+                "Expected {:?} token, but got {:?}.",
+                token_kind, token.kind
+            )));
+        }
+        Ok(token)
+    }
+
     pub fn next_stmt(&mut self) -> Result<Option<Stmt<'src>>, ParseError> {
         loop {
             match self.lexer.peek().kind {
                 TokenKind::Keyword(Keyword::Print) => {
-                    // Consume keyword
-                    self.lexer.advance();
+                    self.lexer.advance(); // Consume `print` keyword
                     let expr = self.next_expr()?;
                     self.assert_semicolon();
                     return Ok(Some(Stmt::Print(expr)));
+                }
+                TokenKind::Keyword(Keyword::Var) => {
+                    self.lexer.advance(); // Consume `var` keyword
+                    let ident = self.expect_token(TokenKind::Ident)?;
+                    self.expect_token(TokenKind::Eq)?;
+                    let init_val = self.next_expr()?;
+                    self.assert_semicolon();
+                    return Ok(Some(Stmt::Var {
+                        name: ident.lexeme,
+                        init_val,
+                    }));
                 }
                 // Consume and ignore comments
                 TokenKind::Comment => {
@@ -471,6 +503,13 @@ mod tests {
     }
 
     #[test]
+    fn parses_ident_in_expr() {
+        let mut parser = Parser::new("a + b");
+        let expr = parser.next_expr().unwrap();
+        assert_eq!(format!("{expr}"), "(+ a b)");
+    }
+
+    #[test]
     fn error_at_unmatched_paren() {
         let mut parser = Parser::new("(72 + 15");
         let res = parser.next_expr();
@@ -516,6 +555,19 @@ mod tests {
             assert_eq!(
                 res,
                 Some(Stmt::Expr(Expr::Atom(Atom::String("hello world"))))
+            )
+        }
+
+        #[test]
+        fn parses_var_declaration() {
+            let mut parser = Parser::new("var a = 12;");
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Var {
+                    name: "a",
+                    init_val: Expr::Atom(Atom::Number(12.0)),
+                })
             )
         }
     }

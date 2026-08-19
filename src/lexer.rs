@@ -43,7 +43,7 @@ pub enum TokenKind<'src> {
     /// `// comment`
     Comment,
     /// e.g. `foo`, `bar`, `_baz`
-    Identifier,
+    Ident,
     /// Any whitespace char
     Whitespace,
     Literal(Literal<'src>),
@@ -277,7 +277,7 @@ impl<'src> Lexer<'src> {
                     "for" => TokenKind::Keyword(Keyword::For),
                     "while" => TokenKind::Keyword(Keyword::While),
                     "print" => TokenKind::Keyword(Keyword::Print),
-                    _ => TokenKind::Identifier,
+                    _ => TokenKind::Ident,
                 }
             }
             c => TokenKind::Unknown {
@@ -653,7 +653,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![Token {
-                    kind: TokenKind::Identifier,
+                    kind: TokenKind::Ident,
                     lexeme: "foo",
                     len: 3,
                     line: 1,
@@ -668,7 +668,7 @@ mod tests {
             assert_eq!(
                 tokens,
                 vec![Token {
-                    kind: TokenKind::Identifier,
+                    kind: TokenKind::Ident,
                     lexeme: "_foo",
                     len: 4,
                     line: 1,
