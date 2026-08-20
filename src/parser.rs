@@ -233,8 +233,17 @@ impl<'src> Parser<'src> {
                 TokenKind::Keyword(Keyword::Var) => {
                     self.lexer.advance(); // Consume `var` keyword
                     let ident = self.expect_token(TokenKind::Ident)?;
-                    self.expect_token(TokenKind::Eq)?;
-                    let init_val = self.next_expr()?;
+                    let init_val = match self.lexer.peek().kind {
+                        TokenKind::Eq => {
+                            self.lexer.advance();
+                            self.next_expr()?
+                        }
+                        TokenKind::Semicolon => Expr::Atom(Atom::Nil),
+                        _ => Err(ParseError::UnexpectedToken {
+                            line: self.current_line(),
+                            lexeme: self.lexer.peek().lexeme.to_owned(),
+                        })?,
+                    };
                     self.assert_semicolon();
                     return Ok(Some(Stmt::Var {
                         name: ident.lexeme,
@@ -567,6 +576,19 @@ mod tests {
                 Some(Stmt::Var {
                     name: "a",
                     init_val: Expr::Atom(Atom::Number(12.0)),
+                })
+            )
+        }
+
+        #[test]
+        fn parses_uninitialized_var_declarations_with_nil_as_init_value() {
+            let mut parser = Parser::new("var a;");
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Var {
+                    name: "a",
+                    init_val: Expr::Atom(Atom::Nil),
                 })
             )
         }
