@@ -1,6 +1,16 @@
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
 use std::{borrow::Cow, collections::HashMap, io::Write};
 
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum RuntimeError {
+    #[error("{0}")]
+    TypeMismatch(String),
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
+    #[error("variable {0} is undeclared")]
+    UndeclaredVar(String),
+}
+
 pub struct Env<'src> {
     map: HashMap<&'src str, Value<'src>>,
 }
@@ -18,6 +28,14 @@ impl<'src> Env<'src> {
 
     pub fn set(&mut self, key: &'src str, val: Value<'src>) {
         self.map.insert(key, val);
+    }
+
+    pub fn update(&mut self, key: &'src str, val: Value<'src>) -> Result<(), RuntimeError> {
+        if !self.map.contains_key(key) {
+            return Err(RuntimeError::UndeclaredVar(key.to_owned()));
+        }
+        self.set(key, val);
+        Ok(())
     }
 }
 
@@ -194,6 +212,15 @@ impl<'src, W: Write> Runtime<'src, W> {
                         "Unsupported operand types for this operation.".to_owned(),
                     ))?,
                 },
+                Op::Assign => match args.as_slice() {
+                    [ident, right] => match (ident, self.eval_expr(right)?) {
+                        (Expr::Atom(Atom::Ident(ident)), val) => {
+                            self.env.update(ident, val.clone())?; Ok(val)
+                        }
+                        _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
+                    },
+                    _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
+                }
             },
         }
     }
@@ -223,16 +250,6 @@ impl Default for Runtime<'_, std::io::Stdout> {
             env: Env::new(),
         }
     }
-}
-
-#[derive(Debug, PartialEq, thiserror::Error)]
-pub enum RuntimeError {
-    #[error("{0}")]
-    TypeMismatch(String),
-    #[error(transparent)]
-    ParseError(#[from] ParseError),
-    #[error("variable {0} is undeclared")]
-    UndeclaredVar(String),
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -619,6 +636,32 @@ mod tests {
             runtime.run(src).unwrap();
             let actual = std::str::from_utf8(&buf).unwrap();
             assert_eq!(actual, "foo\n");
+        }
+
+        #[test]
+        fn assignment_expression_changes_var_value() {
+            let src = "var x = 10; x = 20; print x;";
+            let mut buf = Vec::new();
+            let mut runtime = Runtime::with_out(&mut buf);
+            runtime.run(src).unwrap();
+            let actual = std::str::from_utf8(&buf).unwrap();
+            assert_eq!(actual, "20\n");
+        }
+
+        #[test]
+        fn sequential_assignments_change_all_vars_accordingly() {
+            let src = "
+                var a = 0; 
+                var b = 1; 
+                a = b = 10;
+                print a;
+                print b;
+            ";
+            let mut buf = Vec::new();
+            let mut runtime = Runtime::with_out(&mut buf);
+            runtime.run(src).unwrap();
+            let actual = std::str::from_utf8(&buf).unwrap();
+            assert_eq!(actual, "10\n10\n");
         }
     }
 }
