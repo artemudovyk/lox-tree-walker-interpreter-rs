@@ -1,5 +1,5 @@
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
-use std::{borrow::Cow, collections::HashMap, io::Write};
+use std::{borrow::Cow, cell::RefCell, collections::HashMap, io::Write, rc::Rc};
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
@@ -11,14 +11,24 @@ pub enum RuntimeError {
     UndeclaredVar(String),
 }
 
+#[derive(Debug, Clone)]
 pub struct Env<'src> {
     map: HashMap<&'src str, Value<'src>>,
+    outer: Option<Rc<RefCell<Env<'src>>>>,
 }
 
 impl<'src> Env<'src> {
     fn new() -> Self {
         Self {
             map: HashMap::new(),
+            outer: None,
+        }
+    }
+
+    fn new_inner(&self) -> Self {
+        Self {
+            map: HashMap::new(),
+            outer: Some(Rc::new(RefCell::new(self.clone()))),
         }
     }
 
@@ -237,6 +247,11 @@ impl<'src, W: Write> Runtime<'src, W> {
             Stmt::Var { name, init_val } => {
                 let val = self.eval_expr(&init_val)?;
                 self.env.set(name, val);
+            }
+            Stmt::Block(statements) => {
+                for stmt in statements {
+                    self.exec_stmt(stmt)?;
+                }
             }
         }
         Ok(())
@@ -662,6 +677,29 @@ mod tests {
             runtime.run(src).unwrap();
             let actual = std::str::from_utf8(&buf).unwrap();
             assert_eq!(actual, "10\n10\n");
+        }
+    }
+
+    mod environments {
+        use super::*;
+
+        #[test]
+        fn vars_scoped_to_its_block() {
+            let src = "
+                {
+                    var foo = \"before\";
+                    print foo;
+                }
+                {
+                    var foo = \"after\";
+                    print foo;
+                }
+            ";
+            let mut buf = Vec::new();
+            let mut runtime = Runtime::with_out(&mut buf);
+            runtime.run(src).unwrap();
+            let actual = std::str::from_utf8(&buf).unwrap();
+            assert_eq!(actual, "before\nafter\n");
         }
     }
 }

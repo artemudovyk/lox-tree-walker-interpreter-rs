@@ -1,6 +1,22 @@
 #![allow(dead_code)]
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
+#[derive(Debug, thiserror::Error, PartialEq)]
+pub enum ParseError {
+    #[error("[line {line}] Error at '{lexeme}'. Expect expression.")]
+    UnexpectedToken { line: usize, lexeme: String },
+    #[error("[line {line}] Error at '{lexeme}'. Expect ')'.")]
+    UnmatchedParen { line: usize, lexeme: String },
+    #[error("[line {line}] Error at '{lexeme}'. Unterminated string.")]
+    UnterminatedString { line: usize, lexeme: String },
+    // TODO: somewhat collides with UnexpectedToken - think about a better name for both
+    // I want for this error message
+    #[error("{0}")]
+    ExpectedTokenNotFound(String),
+    #[error("[line {line}] Error at end: Expect '}}'.")]
+    UnclosedBlock { line: usize },
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Stmt<'src> {
     Expr(Expr<'src>),
@@ -9,7 +25,9 @@ pub enum Stmt<'src> {
         name: &'src str,
         init_val: Expr<'src>,
     },
+    Block(Vec<Stmt<'src>>),
 }
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
     Atom(Atom<'src>),
@@ -180,20 +198,6 @@ impl<'src> TryFrom<Token<'src>> for Op {
     }
 }
 
-#[derive(Debug, thiserror::Error, PartialEq)]
-pub enum ParseError {
-    #[error("[line {line}] Error at '{lexeme}'. Expect expression.")]
-    UnexpectedToken { line: usize, lexeme: String },
-    #[error("[line {line}] Error at '{lexeme}'. Expect ')'.")]
-    UnmatchedParen { line: usize, lexeme: String },
-    #[error("[line {line}] Error at '{lexeme}'. Unterminated string.")]
-    UnterminatedString { line: usize, lexeme: String },
-    // TODO: somewhat collides with UnexpectedToken - think about a better name for both
-    // I want for this error message
-    #[error("{0}")]
-    ExpectedTokenNotFound(String),
-}
-
 pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
@@ -225,6 +229,30 @@ impl<'src> Parser<'src> {
         Ok(token)
     }
 
+    fn parse_block(&mut self) -> Result<Vec<Stmt<'src>>, ParseError> {
+        let mut statements = vec![];
+        loop {
+            match self.lexer.peek().kind {
+                TokenKind::RightBrace => {
+                    self.lexer.advance();
+                    break;
+                }
+                // TODO: not sure about that, but I'll leave it here for a time being
+                // need to think about a better way to check if block is properly closed
+                TokenKind::Eof => {
+                    return Err(ParseError::UnclosedBlock {
+                        line: self.current_line(),
+                    });
+                }
+                _ => statements.push(
+                    self.next_stmt()?
+                        .expect("Statement is expected at this point"),
+                ),
+            }
+        }
+        Ok(statements)
+    }
+
     pub fn next_stmt(&mut self) -> Result<Option<Stmt<'src>>, ParseError> {
         loop {
             match self.lexer.peek().kind {
@@ -253,6 +281,10 @@ impl<'src> Parser<'src> {
                         name: ident.lexeme,
                         init_val,
                     }));
+                }
+                TokenKind::LeftBrace => {
+                    self.lexer.advance();
+                    return Ok(Some(Stmt::Block(self.parse_block()?)));
                 }
                 // Consume and ignore comments
                 TokenKind::Comment => {
@@ -609,6 +641,89 @@ mod tests {
                     init_val: Expr::Atom(Atom::Nil),
                 })
             )
+        }
+
+        #[test]
+        fn block() {
+            let src = "
+                {
+                    var x = 1; 
+                    var y = 2;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Block(vec![
+                    Stmt::Var {
+                        name: "x",
+                        init_val: Expr::Atom(Atom::Number(1.0))
+                    },
+                    Stmt::Var {
+                        name: "y",
+                        init_val: Expr::Atom(Atom::Number(2.0))
+                    },
+                ]))
+            )
+        }
+
+        #[test]
+        fn two_blocks() {
+            let src = "
+                {
+                    var x = 1; 
+                    var y = 2;
+                }
+                {
+                    var a = 3;
+                    var b = 4;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Block(vec![
+                    Stmt::Var {
+                        name: "x",
+                        init_val: Expr::Atom(Atom::Number(1.0))
+                    },
+                    Stmt::Var {
+                        name: "y",
+                        init_val: Expr::Atom(Atom::Number(2.0))
+                    },
+                ]))
+            );
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::Block(vec![
+                    Stmt::Var {
+                        name: "a",
+                        init_val: Expr::Atom(Atom::Number(3.0))
+                    },
+                    Stmt::Var {
+                        name: "b",
+                        init_val: Expr::Atom(Atom::Number(4.0))
+                    },
+                ]))
+            );
+        }
+
+        #[test]
+        fn unclosed_block_raises_error() {
+            let src = "
+                {
+                    var bar = 11;
+                    var world = 11;
+                    {
+                        print bar + world;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt();
+            assert_eq!(res, Err(ParseError::UnclosedBlock { line: 8 }));
         }
     }
 }
