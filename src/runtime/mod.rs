@@ -1,5 +1,8 @@
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
-use std::{borrow::Cow, cell::RefCell, collections::HashMap, io::Write, rc::Rc};
+use env::Env;
+use std::{borrow::Cow, cell::RefCell, io::Write, rc::Rc};
+
+mod env;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
@@ -11,54 +14,16 @@ pub enum RuntimeError {
     UndeclaredVar(String),
 }
 
-#[derive(Debug, Clone)]
-pub struct Env<'src> {
-    map: HashMap<&'src str, Value<'src>>,
-    outer: Option<Rc<RefCell<Env<'src>>>>,
-}
-
-impl<'src> Env<'src> {
-    fn new() -> Self {
-        Self {
-            map: HashMap::new(),
-            outer: None,
-        }
-    }
-
-    fn new_inner(&self) -> Self {
-        Self {
-            map: HashMap::new(),
-            outer: Some(Rc::new(RefCell::new(self.clone()))),
-        }
-    }
-
-    pub fn get(&self, key: &str) -> Option<&Value<'src>> {
-        self.map.get(key)
-    }
-
-    pub fn set(&mut self, key: &'src str, val: Value<'src>) {
-        self.map.insert(key, val);
-    }
-
-    pub fn update(&mut self, key: &'src str, val: Value<'src>) -> Result<(), RuntimeError> {
-        if !self.map.contains_key(key) {
-            return Err(RuntimeError::UndeclaredVar(key.to_owned()));
-        }
-        self.set(key, val);
-        Ok(())
-    }
-}
-
 pub struct Runtime<'src, W: Write> {
     out: W,
-    env: Env<'src>,
+    env: Rc<RefCell<Env<'src>>>,
 }
 
 impl<'src, W: Write> Runtime<'src, W> {
     pub fn with_out(writer: W) -> Self {
         Self {
             out: writer,
-            env: Env::new(),
+            env: Rc::new(RefCell::new(Env::new())),
         }
     }
 
@@ -79,6 +44,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Atom::Nil => Ok(Value::Nil),
                 Atom::Ident(ident) => Ok(self
                     .env
+                    .borrow()
                     .get(ident)
                     .map(|v| v.to_owned())
                     .ok_or(RuntimeError::UndeclaredVar(ident.to_string()))?),
@@ -225,7 +191,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Op::Assign => match args.as_slice() {
                     [ident, right] => match (ident, self.eval_expr(right)?) {
                         (Expr::Atom(Atom::Ident(ident)), val) => {
-                            self.env.update(ident, val.clone())?; Ok(val)
+                            self.env.borrow_mut().update(ident, val.clone())?; Ok(val)
                         }
                         _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                     },
@@ -246,12 +212,17 @@ impl<'src, W: Write> Runtime<'src, W> {
             }
             Stmt::Var { name, init_val } => {
                 let val = self.eval_expr(&init_val)?;
-                self.env.set(name, val);
+                self.env.borrow_mut().set(name, val);
             }
             Stmt::Block(statements) => {
+                let prev_env = self.env.clone();
+                self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
+
                 for stmt in statements {
                     self.exec_stmt(stmt)?;
                 }
+
+                self.env = prev_env;
             }
         }
         Ok(())
@@ -262,7 +233,7 @@ impl Default for Runtime<'_, std::io::Stdout> {
     fn default() -> Self {
         Self {
             out: std::io::stdout(),
-            env: Env::new(),
+            env: Rc::new(RefCell::new(Env::new())),
         }
     }
 }
@@ -684,22 +655,22 @@ mod tests {
         use super::*;
 
         #[test]
-        fn vars_scoped_to_its_block() {
+        fn local_vars_overshadow_ones_from_outer_environemnt() {
             let src = "
                 {
-                    var foo = \"before\";
-                    print foo;
-                }
-                {
-                    var foo = \"after\";
-                    print foo;
+                    var world = \"before\";
+                    {
+                        var world = \"after\";
+                        print world;
+                    }
+                    print world;
                 }
             ";
             let mut buf = Vec::new();
             let mut runtime = Runtime::with_out(&mut buf);
             runtime.run(src).unwrap();
             let actual = std::str::from_utf8(&buf).unwrap();
-            assert_eq!(actual, "before\nafter\n");
+            assert_eq!(actual, "after\nbefore\n");
         }
     }
 }
