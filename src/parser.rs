@@ -128,6 +128,8 @@ pub enum Op {
     EqEq,
     NotEq,
     Assign,
+    And,
+    Or,
 }
 
 impl std::fmt::Display for Op {
@@ -146,6 +148,8 @@ impl std::fmt::Display for Op {
             Self::EqEq => write!(f, "=="),
             Self::NotEq => write!(f, "!="),
             Self::Assign => write!(f, "="),
+            Self::And => write!(f, "and"),
+            Self::Or => write!(f, "or"),
         }
     }
 }
@@ -154,22 +158,24 @@ impl Op {
     fn infix_bp(&self) -> Option<(u8, u8)> {
         match self {
             Self::Assign => Some((2, 1)),
+            Self::Or => Some((2, 3)),
+            Self::And => Some((4, 5)),
             Self::Less
             | Self::LessEq
             | Self::Greater
             | Self::GreaterEq
             | Self::EqEq
-            | Self::NotEq => Some((3, 4)),
-            Self::Add | Self::Minus => Some((5, 6)),
-            Self::Mult | Self::Div => Some((7, 8)),
+            | Self::NotEq => Some((6, 7)),
+            Self::Add | Self::Minus => Some((8, 9)),
+            Self::Mult | Self::Div => Some((10, 11)),
             _ => None,
         }
     }
 
     fn prefix_bp(&self) -> Option<u8> {
         match self {
-            Self::Bang => Some(10),
-            Self::Minus => Some(10),
+            Self::Bang => Some(20),
+            Self::Minus => Some(20),
             _ => None,
         }
     }
@@ -192,6 +198,8 @@ impl<'src> TryFrom<&Token<'src>> for Op {
             TokenKind::EqEq => Ok(Op::EqEq),
             TokenKind::BangEq => Ok(Op::NotEq),
             TokenKind::Eq => Ok(Op::Assign),
+            TokenKind::Keyword(Keyword::And) => Ok(Op::And),
+            TokenKind::Keyword(Keyword::Or) => Ok(Op::Or),
             _ => Err(()),
         }
     }
@@ -611,6 +619,20 @@ mod tests {
         let mut parser = Parser::new("a + b");
         let expr = parser.next_expr().unwrap();
         assert_eq!(format!("{expr}"), "(+ a b)");
+    }
+
+    #[test]
+    fn and() {
+        let mut parser = Parser::new("true and false");
+        let expr = parser.next_expr().unwrap();
+        assert_eq!(format!("{expr}"), "(and true false)");
+    }
+
+    #[test]
+    fn or() {
+        let mut parser = Parser::new("true or false");
+        let expr = parser.next_expr().unwrap();
+        assert_eq!(format!("{expr}"), "(or true false)");
     }
 
     #[test]

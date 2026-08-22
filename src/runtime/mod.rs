@@ -197,6 +197,14 @@ impl<'src, W: Write> Runtime<'src, W> {
                     },
                     _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                 }
+                Op::And => match args.as_slice() {
+                    [left, right] => Ok(Value::Bool(self.eval_expr(left)?.is_truthy() && self.eval_expr(right)?.is_truthy())),
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operand types for this operation.".to_owned()))?
+                }
+                Op::Or => match args.as_slice() {
+                    [left, right] => Ok(Value::Bool(self.eval_expr(left)?.is_truthy() || self.eval_expr(right)?.is_truthy())),
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operand types for this operation.".to_owned()))?
+                }
             },
         }
     }
@@ -601,6 +609,46 @@ mod tests {
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Bool(true));
+        }
+    }
+
+    mod and {
+        use super::*;
+
+        #[test]
+        fn true_and_false_produce_false() {
+            let mut parser = Parser::new("true and false");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn true_and_true_produce_true() {
+            let mut parser = Parser::new("true and true");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+    }
+
+    mod or {
+        use super::*;
+
+        #[test]
+        fn true_or_false_produce_true() {
+            let mut parser = Parser::new("true or false");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Bool(true));
+        }
+
+        #[test]
+        fn false_or_false_produce_false() {
+            let mut parser = Parser::new("false or false");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Bool(false));
         }
     }
 
