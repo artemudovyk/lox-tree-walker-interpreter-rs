@@ -198,12 +198,26 @@ impl<'src, W: Write> Runtime<'src, W> {
                     _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                 }
                 Op::And => match args.as_slice() {
-                    [left, right] => Ok(Value::Bool(self.eval_expr(left)?.is_truthy() && self.eval_expr(right)?.is_truthy())),
-                    _ => Err(RuntimeError::TypeMismatch("Unsupported operand types for this operation.".to_owned()))?
+                    [left, right] => {
+                        let left = self.eval_expr(left)?;
+                        if !left.is_truthy() {
+                            return Ok(left)
+                        }
+                        let right = self.eval_expr(right)?;
+                        Ok(right)
+                    }
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                 }
                 Op::Or => match args.as_slice() {
-                    [left, right] => Ok(Value::Bool(self.eval_expr(left)?.is_truthy() || self.eval_expr(right)?.is_truthy())),
-                    _ => Err(RuntimeError::TypeMismatch("Unsupported operand types for this operation.".to_owned()))?
+                    [left, right] => {
+                        let left = self.eval_expr(left)?;
+                        if left.is_truthy() {
+                            return Ok(left)
+                        }
+                        let right = self.eval_expr(right)?;
+                        Ok(right)
+                    }
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                 }
             },
         }
@@ -630,6 +644,14 @@ mod tests {
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Bool(true));
         }
+
+        #[test]
+        fn short_circuits_and_returns_first_untruthy_value() {
+            let mut parser = Parser::new("0 and 96");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Number(0.0));
+        }
     }
 
     mod or {
@@ -649,6 +671,14 @@ mod tests {
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Bool(false));
+        }
+
+        #[test]
+        fn short_circuits_and_returns_first_truthy_value() {
+            let mut parser = Parser::new("96 or true");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Number(96.0));
         }
     }
 
