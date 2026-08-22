@@ -15,6 +15,8 @@ pub enum ParseError {
     ExpectedTokenNotFound(String),
     #[error("[line {line}] Error at end: Expect '}}'.")]
     UnclosedBlock { line: usize },
+    #[error("[line {line}] Expected statement after if condition.")]
+    EmptyIfStatement { line: usize },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -26,6 +28,11 @@ pub enum Stmt<'src> {
         init_val: Expr<'src>,
     },
     Block(Vec<Stmt<'src>>),
+    If {
+        condition: Expr<'src>,
+        stmt: Box<Stmt<'src>>,
+        else_stmt: Option<Box<Stmt<'src>>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -280,6 +287,44 @@ impl<'src> Parser<'src> {
                     return Ok(Some(Stmt::Var {
                         name: ident.lexeme,
                         init_val,
+                    }));
+                }
+                TokenKind::Keyword(Keyword::If) => {
+                    self.lexer.advance();
+                    self.expect_token(TokenKind::LeftParen)?;
+                    let cond = self.next_expr()?;
+                    self.expect_token(TokenKind::RightParen)?;
+                    let stmt = match self.lexer.peek().kind {
+                        TokenKind::LeftBrace => {
+                            self.lexer.advance();
+                            let statements = self.parse_block()?;
+                            Box::new(Stmt::Block(statements))
+                        }
+                        _ => match self.next_stmt()? {
+                            Some(s) => Box::new(s),
+                            None => Err(ParseError::EmptyIfStatement {
+                                line: self.current_line(),
+                            })?,
+                        },
+                    };
+                    let else_stmt = match self.lexer.peek().kind {
+                        TokenKind::Keyword(Keyword::Else) => {
+                            self.lexer.advance();
+                            match self.lexer.peek().kind {
+                                TokenKind::LeftBrace => {
+                                    self.lexer.advance();
+                                    let statements = self.parse_block()?;
+                                    Some(Box::new(Stmt::Block(statements)))
+                                }
+                                _ => self.next_stmt()?.map(Box::new),
+                            }
+                        }
+                        _ => None,
+                    };
+                    return Ok(Some(Stmt::If {
+                        condition: cond,
+                        stmt,
+                        else_stmt,
                     }));
                 }
                 TokenKind::LeftBrace => {
@@ -724,6 +769,103 @@ mod tests {
             let mut parser = Parser::new(src);
             let res = parser.next_stmt();
             assert_eq!(res, Err(ParseError::UnclosedBlock { line: 8 }));
+        }
+
+        #[test]
+        fn if_with_inline_statement() {
+            let src = "if (true) print \"good\";";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::If {
+                    condition: Expr::Atom(Atom::Bool(true)),
+                    stmt: Box::new(Stmt::Print(Expr::Atom(Atom::String("good")))),
+                    else_stmt: None,
+                })
+            )
+        }
+
+        #[test]
+        fn if_with_block_statement() {
+            let src = "
+                if (true) {
+                    var a = 10;
+                    print a;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::If {
+                    condition: Expr::Atom(Atom::Bool(true)),
+                    stmt: Box::new(Stmt::Block(vec![
+                        Stmt::Var {
+                            name: "a",
+                            init_val: Expr::Atom(Atom::Number(10.0))
+                        },
+                        Stmt::Print(Expr::Atom(Atom::Ident("a"))),
+                    ])),
+                    else_stmt: None,
+                })
+            )
+        }
+
+        #[test]
+        fn if_with_inline_else_statment() {
+            let src = "
+                if (false) {
+                    print \"good\";
+                } else print \"bad\";
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::If {
+                    condition: Expr::Atom(Atom::Bool(false)),
+                    stmt: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::String(
+                        "good"
+                    ))),])),
+                    else_stmt: Some(Box::new(Stmt::Print(Expr::Atom(Atom::String("bad")))))
+                })
+            )
+        }
+
+        #[test]
+        fn if_with_else_block_statement() {
+            let src = "
+                if (true) {
+                    var a = 10;
+                    print a;
+                } else {
+                    var b = 20;
+                    print b;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::If {
+                    condition: Expr::Atom(Atom::Bool(true)),
+                    stmt: Box::new(Stmt::Block(vec![
+                        Stmt::Var {
+                            name: "a",
+                            init_val: Expr::Atom(Atom::Number(10.0))
+                        },
+                        Stmt::Print(Expr::Atom(Atom::Ident("a"))),
+                    ])),
+                    else_stmt: Some(Box::new(Stmt::Block(vec![
+                        Stmt::Var {
+                            name: "b",
+                            init_val: Expr::Atom(Atom::Number(20.0))
+                        },
+                        Stmt::Print(Expr::Atom(Atom::Ident("b"))),
+                    ]))),
+                })
+            )
         }
     }
 }

@@ -224,6 +224,17 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                 self.env = prev_env;
             }
+            Stmt::If {
+                condition,
+                stmt,
+                else_stmt,
+            } => {
+                if self.eval_expr(&condition)?.is_truthy() {
+                    self.exec_stmt(*stmt)?
+                } else if let Some(else_stmt) = else_stmt {
+                    self.exec_stmt(*else_stmt)?
+                }
+            }
         }
         Ok(())
     }
@@ -244,6 +255,17 @@ pub enum Value<'src> {
     String(Cow<'src, str>),
     Bool(bool),
     Nil,
+}
+
+impl<'src> Value<'src> {
+    fn is_truthy(&self) -> bool {
+        match self {
+            Self::Number(n) => *n != 0.0,
+            Self::String(s) => !s.is_empty(),
+            Self::Bool(bool) => *bool,
+            Self::Nil => false,
+        }
+    }
 }
 
 impl<'src> std::fmt::Display for Value<'src> {
@@ -671,6 +693,46 @@ mod tests {
             runtime.run(src).unwrap();
             let actual = std::str::from_utf8(&buf).unwrap();
             assert_eq!(actual, "after\nbefore\n");
+        }
+    }
+
+    mod control_flow {
+        use super::*;
+
+        mod if_else {
+            use super::*;
+
+            #[test]
+            fn executes_stmt_if_condition_is_true() {
+                let src = "
+                if (true) {
+                    print \"good\";
+                } else {
+                    print \"bad\";
+                }
+            ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "good\n");
+            }
+
+            #[test]
+            fn executes_else_stmt_if_condition_is_false() {
+                let src = "
+                if (false) {
+                    print \"good\";
+                } else {
+                    print \"bad\";
+                }
+            ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "bad\n");
+            }
         }
     }
 }
