@@ -652,6 +652,14 @@ mod tests {
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Number(0.0));
         }
+
+        #[test]
+        fn short_circuits_and_returns_first_untruthy_value_sequenced() {
+            let mut parser = Parser::new("0 and 96 and \"\"");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Number(0.0));
+        }
     }
 
     mod or {
@@ -676,6 +684,14 @@ mod tests {
         #[test]
         fn short_circuits_and_returns_first_truthy_value() {
             let mut parser = Parser::new("96 or true");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Number(96.0));
+        }
+
+        #[test]
+        fn short_circuits_and_returns_first_truthy_value_sequenced() {
+            let mut parser = Parser::new("96 or true or 0 or 12");
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Number(96.0));

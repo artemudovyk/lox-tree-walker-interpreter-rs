@@ -158,8 +158,8 @@ impl Op {
     fn infix_bp(&self) -> Option<(u8, u8)> {
         match self {
             Self::Assign => Some((2, 1)),
-            Self::Or => Some((2, 3)),
-            Self::And => Some((4, 5)),
+            Self::Or => Some((3, 2)),
+            Self::And => Some((5, 4)),
             Self::Less
             | Self::LessEq
             | Self::Greater
