@@ -260,11 +260,7 @@ impl<'src, W: Write> Runtime<'src, W> {
             Stmt::While { condition, body } => loop {
                 if self.eval_expr(&condition)?.is_truthy() {
                     match *body.clone() {
-                        Stmt::Block(stmts) => {
-                            for stmt in stmts {
-                                self.exec_stmt(stmt)?
-                            }
-                        }
+                        block @ Stmt::Block(_) => self.exec_stmt(block)?,
                         stmt => self.exec_stmt(stmt.clone())?,
                     }
                 } else {
@@ -283,11 +279,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                 loop {
                     if self.eval_expr(&condition)?.is_truthy() {
                         match *body.clone() {
-                            Stmt::Block(stmts) => {
-                                for stmt in stmts {
-                                    self.exec_stmt(stmt)?
-                                }
-                            }
+                            block @ Stmt::Block(_) => self.exec_stmt(block)?,
                             stmt => self.exec_stmt(stmt.clone())?,
                         }
                         if let Some(incr_expr) = &increment {
