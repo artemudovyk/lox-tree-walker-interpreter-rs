@@ -265,7 +265,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 self.exec_stmt(stmt)?
                             }
                         }
-                        _ => unreachable!(),
+                        stmt => self.exec_stmt(stmt.clone())?,
                     }
                 } else {
                     break;
@@ -661,18 +661,18 @@ mod tests {
 
         #[test]
         fn short_circuits_and_returns_first_untruthy_value() {
-            let mut parser = Parser::new("0 and 96");
+            let mut parser = Parser::new("false and 96");
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
-            assert_eq!(value, Value::Number(0.0));
+            assert_eq!(value, Value::Bool(false));
         }
 
         #[test]
         fn short_circuits_and_returns_first_untruthy_value_sequenced() {
-            let mut parser = Parser::new("0 and 96 and \"\"");
+            let mut parser = Parser::new("false and 96 and \"\"");
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
-            assert_eq!(value, Value::Number(0.0));
+            assert_eq!(value, Value::Bool(false));
         }
 
         #[test]
@@ -855,18 +855,32 @@ mod tests {
             use super::*;
 
             #[test]
-            fn executes_stmt_if_condition_is_true() {
+            fn loops_over_body_while_a_given_condition_is_true() {
                 let src = "
-                var a = 0;
-                while (a < 3) {
-                    print \"hello\";
-                    a = a + 1;
-                }             ";
+                    var a = 0;
+                    while (a < 3) {
+                        print \"hello\";
+                        a = a + 1;
+                    }
+                ";
                 let mut buf = Vec::new();
                 let mut runtime = Runtime::with_out(&mut buf);
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "hello\nhello\nhello\n");
+            }
+
+            #[test]
+            fn loops_over_statement_while_a_given_condition_is_true() {
+                let src = "
+                    var a = 0;
+                    while (a < 3) print a = a + 1;
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "1\n2\n3\n");
             }
         }
     }

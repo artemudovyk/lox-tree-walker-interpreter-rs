@@ -17,6 +17,8 @@ pub enum ParseError {
     UnclosedBlock { line: usize },
     #[error("[line {line}] Expected statement after if condition.")]
     EmptyIfStatement { line: usize },
+    #[error("[line {line}] Expected statement after while condition.")]
+    EmptyWhileStatement { line: usize },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -350,12 +352,12 @@ impl<'src> Parser<'src> {
                             let statements = self.parse_block()?;
                             Box::new(Stmt::Block(statements))
                         }
-                        _ => {
-                            return Err(ParseError::UnexpectedToken {
+                        _ => match self.next_stmt()? {
+                            Some(s) => Box::new(s),
+                            None => Err(ParseError::EmptyWhileStatement {
                                 line: self.current_line(),
-                                lexeme: self.lexer.peek().lexeme.to_owned(),
-                            });
-                        }
+                            })?,
+                        },
                     };
                     return Ok(Some(Stmt::While {
                         condition: cond,
