@@ -282,8 +282,8 @@ pub enum Value<'src> {
 impl<'src> Value<'src> {
     fn is_truthy(&self) -> bool {
         match self {
-            Self::Number(n) => *n != 0.0,
-            Self::String(s) => !s.is_empty(),
+            Self::Number(_) => true,
+            Self::String(_) => true,
             Self::Bool(bool) => *bool,
             Self::Nil => false,
         }
@@ -659,6 +659,14 @@ mod tests {
             let expr = parser.next_expr().unwrap();
             let value = Runtime::default().eval_expr(&expr).unwrap();
             assert_eq!(value, Value::Number(0.0));
+        }
+
+        #[test]
+        fn returns_last_value_if_all_values_are_truthy() {
+            let mut parser = Parser::new("10 and 20 and \"abc\" and 12");
+            let expr = parser.next_expr().unwrap();
+            let value = Runtime::default().eval_expr(&expr).unwrap();
+            assert_eq!(value, Value::Number(12.0));
         }
     }
 
