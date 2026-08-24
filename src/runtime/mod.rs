@@ -257,6 +257,20 @@ impl<'src, W: Write> Runtime<'src, W> {
                     self.exec_stmt(*else_stmt)?
                 }
             }
+            Stmt::While { condition, body } => loop {
+                if self.eval_expr(&condition)?.is_truthy() {
+                    match *body.clone() {
+                        Stmt::Block(stmts) => {
+                            for stmt in stmts {
+                                self.exec_stmt(stmt)?
+                            }
+                        }
+                        _ => unreachable!(),
+                    }
+                } else {
+                    break;
+                }
+            },
         }
         Ok(())
     }
@@ -834,6 +848,25 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "bad\n");
+            }
+        }
+
+        mod while_stmt {
+            use super::*;
+
+            #[test]
+            fn executes_stmt_if_condition_is_true() {
+                let src = "
+                var a = 0;
+                while (a < 3) {
+                    print \"hello\";
+                    a = a + 1;
+                }             ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "hello\nhello\nhello\n");
             }
         }
     }

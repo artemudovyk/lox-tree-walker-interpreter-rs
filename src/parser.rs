@@ -33,6 +33,10 @@ pub enum Stmt<'src> {
         stmt: Box<Stmt<'src>>,
         else_stmt: Option<Box<Stmt<'src>>>,
     },
+    While {
+        condition: Expr<'src>,
+        body: Box<Stmt<'src>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -333,6 +337,29 @@ impl<'src> Parser<'src> {
                         condition: cond,
                         stmt,
                         else_stmt,
+                    }));
+                }
+                TokenKind::Keyword(Keyword::While) => {
+                    self.lexer.advance();
+                    self.expect_token(TokenKind::LeftParen)?;
+                    let cond = self.next_expr()?;
+                    self.expect_token(TokenKind::RightParen)?;
+                    let body = match self.lexer.peek().kind {
+                        TokenKind::LeftBrace => {
+                            self.lexer.advance();
+                            let statements = self.parse_block()?;
+                            Box::new(Stmt::Block(statements))
+                        }
+                        _ => {
+                            return Err(ParseError::UnexpectedToken {
+                                line: self.current_line(),
+                                lexeme: self.lexer.peek().lexeme.to_owned(),
+                            });
+                        }
+                    };
+                    return Ok(Some(Stmt::While {
+                        condition: cond,
+                        body,
                     }));
                 }
                 TokenKind::LeftBrace => {
@@ -886,6 +913,26 @@ mod tests {
                         },
                         Stmt::Print(Expr::Atom(Atom::Ident("b"))),
                     ]))),
+                })
+            )
+        }
+
+        #[test]
+        fn parses_while_stmt() {
+            let src = "
+                while (true) {
+                    print 10;
+                }
+            ";
+            let mut parser = Parser::new(src);
+            let res = parser.next_stmt().unwrap();
+            assert_eq!(
+                res,
+                Some(Stmt::While {
+                    condition: Expr::Atom(Atom::Bool(true)),
+                    body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Number(
+                        10.0
+                    )))])),
                 })
             )
         }
