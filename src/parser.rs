@@ -39,6 +39,12 @@ pub enum Stmt<'src> {
         condition: Expr<'src>,
         body: Box<Stmt<'src>>,
     },
+    For {
+        initializer: Option<Box<Stmt<'src>>>,
+        condition: Expr<'src>,
+        increment: Option<Expr<'src>>,
+        body: Box<Stmt<'src>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -361,6 +367,44 @@ impl<'src> Parser<'src> {
                     };
                     return Ok(Some(Stmt::While {
                         condition: cond,
+                        body,
+                    }));
+                }
+                TokenKind::Keyword(Keyword::For) => {
+                    self.lexer.advance();
+                    self.expect_token(TokenKind::LeftParen)?;
+                    let initializer = match self.lexer.peek().kind {
+                        TokenKind::Semicolon => {
+                            self.lexer.advance();
+                            None
+                        }
+                        _ => Some(self.next_stmt()?.expect("Expect a statement")),
+                    };
+                    let cond = self.next_expr()?;
+                    self.assert_semicolon();
+                    let increment = match self.lexer.peek().kind {
+                        TokenKind::RightParen => None,
+                        _ => Some(self.next_expr()?),
+                    };
+                    self.expect_token(TokenKind::RightParen)?;
+                    let body = match self.lexer.peek().kind {
+                        TokenKind::LeftBrace => {
+                            self.lexer.advance();
+                            let statements = self.parse_block()?;
+                            Box::new(Stmt::Block(statements))
+                        }
+                        _ => match self.next_stmt()? {
+                            Some(s) => Box::new(s),
+                            // TODO: change to for-related error
+                            None => Err(ParseError::EmptyWhileStatement {
+                                line: self.current_line(),
+                            })?,
+                        },
+                    };
+                    return Ok(Some(Stmt::For {
+                        initializer: initializer.map(Box::new),
+                        condition: cond,
+                        increment,
                         body,
                     }));
                 }
@@ -920,7 +964,7 @@ mod tests {
         }
 
         #[test]
-        fn parses_while_stmt() {
+        fn parses_while_stmt_with_block_body() {
             let src = "
                 while (true) {
                     print 10;
@@ -937,6 +981,153 @@ mod tests {
                     )))])),
                 })
             )
+        }
+
+        mod for_stmt {
+            use super::*;
+
+            #[test]
+            fn parses_stmt_with_single_stmt_body() {
+                let src = "
+                for (var i = 0; i < 10; i = i + 1) print i;
+            ";
+                let mut parser = Parser::new(src);
+                let res = parser.next_stmt().unwrap();
+                assert_eq!(
+                    res,
+                    Some(Stmt::For {
+                        initializer: Some(Box::new(Stmt::Var {
+                            name: "i",
+                            init_val: Expr::Atom(Atom::Number(0.0)),
+                        })),
+                        condition: Expr::Cons(
+                            Op::Less,
+                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(10.0))]
+                        ),
+                        increment: Some(Expr::Cons(
+                            Op::Assign,
+                            vec![
+                                Expr::Atom(Atom::Ident("i")),
+                                Expr::Cons(
+                                    Op::Add,
+                                    vec![
+                                        Expr::Atom(Atom::Ident("i")),
+                                        Expr::Atom(Atom::Number(1.0))
+                                    ]
+                                )
+                            ]
+                        )),
+                        body: Box::new(Stmt::Print(Expr::Atom(Atom::Ident("i")))),
+                    })
+                )
+            }
+
+            #[test]
+            fn parses_stmt_with_block_stmt_body() {
+                let src = "
+                for (var i = 0; i < 10; i = i + 1) {
+                    print i;
+                }
+            ";
+                let mut parser = Parser::new(src);
+                let res = parser.next_stmt().unwrap();
+                assert_eq!(
+                    res,
+                    Some(Stmt::For {
+                        initializer: Some(Box::new(Stmt::Var {
+                            name: "i",
+                            init_val: Expr::Atom(Atom::Number(0.0)),
+                        })),
+                        condition: Expr::Cons(
+                            Op::Less,
+                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(10.0))]
+                        ),
+                        increment: Some(Expr::Cons(
+                            Op::Assign,
+                            vec![
+                                Expr::Atom(Atom::Ident("i")),
+                                Expr::Cons(
+                                    Op::Add,
+                                    vec![
+                                        Expr::Atom(Atom::Ident("i")),
+                                        Expr::Atom(Atom::Number(1.0))
+                                    ]
+                                )
+                            ]
+                        )),
+                        body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Ident(
+                            "i"
+                        )))])),
+                    })
+                )
+            }
+
+            #[test]
+            fn can_skip_increment_expr() {
+                let src = "
+                    for (var i = 0; i < 3;) {
+                        print i;
+                        i = i + 1;
+                    }
+                ";
+                let mut parser = Parser::new(src);
+                let res = parser.next_stmt().unwrap();
+                assert_eq!(
+                    res,
+                    Some(Stmt::For {
+                        initializer: Some(Box::new(Stmt::Var {
+                            name: "i",
+                            init_val: Expr::Atom(Atom::Number(0.0)),
+                        })),
+                        condition: Expr::Cons(
+                            Op::Less,
+                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(3.0))]
+                        ),
+                        increment: None,
+                        body: Box::new(Stmt::Block(vec![
+                            Stmt::Print(Expr::Atom(Atom::Ident("i"))),
+                            Stmt::Expr(Expr::Cons(
+                                Op::Assign,
+                                vec![
+                                    Expr::Atom(Atom::Ident("i")),
+                                    Expr::Cons(
+                                        Op::Add,
+                                        vec![
+                                            Expr::Atom(Atom::Ident("i")),
+                                            Expr::Atom(Atom::Number(1.0))
+                                        ]
+                                    )
+                                ]
+                            ))
+                        ])),
+                    })
+                )
+            }
+
+            #[test]
+            fn can_skip_initializer() {
+                let src = "
+                    for (; i < 3;) {
+                        print i;
+                    }
+                ";
+                let mut parser = Parser::new(src);
+                let res = parser.next_stmt().unwrap();
+                assert_eq!(
+                    res,
+                    Some(Stmt::For {
+                        initializer: None,
+                        condition: Expr::Cons(
+                            Op::Less,
+                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(3.0))]
+                        ),
+                        increment: None,
+                        body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Ident(
+                            "i"
+                        ))),])),
+                    })
+                )
+            }
         }
     }
 }

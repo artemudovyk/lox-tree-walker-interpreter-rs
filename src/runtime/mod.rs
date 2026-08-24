@@ -271,6 +271,33 @@ impl<'src, W: Write> Runtime<'src, W> {
                     break;
                 }
             },
+            Stmt::For {
+                initializer,
+                condition,
+                increment,
+                body,
+            } => {
+                if let Some(init) = initializer {
+                    self.exec_stmt(*init)?;
+                }
+                loop {
+                    if self.eval_expr(&condition)?.is_truthy() {
+                        match *body.clone() {
+                            Stmt::Block(stmts) => {
+                                for stmt in stmts {
+                                    self.exec_stmt(stmt)?
+                                }
+                            }
+                            stmt => self.exec_stmt(stmt.clone())?,
+                        }
+                        if let Some(incr_expr) = &increment {
+                            self.eval_expr(incr_expr)?;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+            }
         }
         Ok(())
     }
@@ -881,6 +908,24 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "1\n2\n3\n");
+            }
+        }
+
+        mod for_stmt {
+            use super::*;
+
+            #[test]
+            fn loops_over_body_while_a_given_condition_is_true() {
+                let src = "
+                    for (var i = 0; i < 3; i = i + 1) {
+                        print i;
+                    }
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "0\n1\n2\n");
             }
         }
     }
