@@ -219,6 +219,9 @@ impl<'src, W: Write> Runtime<'src, W> {
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                 }
+                Op::Call => {
+                    todo!()
+                }
             },
         }
     }

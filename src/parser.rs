@@ -142,6 +142,7 @@ pub enum Op {
     Assign,
     And,
     Or,
+    Call,
 }
 
 impl std::fmt::Display for Op {
@@ -162,6 +163,7 @@ impl std::fmt::Display for Op {
             Self::Assign => write!(f, "="),
             Self::And => write!(f, "and"),
             Self::Or => write!(f, "or"),
+            Self::Call => write!(f, "call"),
         }
     }
 }
@@ -191,6 +193,13 @@ impl Op {
             _ => None,
         }
     }
+
+    fn postfix_bp(&self) -> Option<u8> {
+        match self {
+            Self::Call => Some(20),
+            _ => None,
+        }
+    }
 }
 
 impl<'src> TryFrom<&Token<'src>> for Op {
@@ -212,6 +221,7 @@ impl<'src> TryFrom<&Token<'src>> for Op {
             TokenKind::Eq => Ok(Op::Assign),
             TokenKind::Keyword(Keyword::And) => Ok(Op::And),
             TokenKind::Keyword(Keyword::Or) => Ok(Op::Or),
+            TokenKind::LeftParen => Ok(Op::Call),
             _ => Err(()),
         }
     }
@@ -469,23 +479,61 @@ impl<'src> Parser<'src> {
 
         loop {
             let peeked = self.lexer.peek();
-            if let Ok(op) = Op::try_from(peeked)
-                && let Some((l_bp, r_bp)) = op.infix_bp()
-            {
-                // If the next operator's left binding power is less than minimum, it is not strong
-                // enough to bind the next atom, so we break and return lhs we've built so far
-                if l_bp < min_bp {
-                    break;
+            if let Ok(op) = Op::try_from(peeked) {
+                if let Some(l_bp) = op.postfix_bp() {
+                    if l_bp < min_bp {
+                        break;
+                    }
+                    self.lexer.advance();
+                    lhs = match op {
+                        // If a function call, parse all comma-separated arguments first
+                        Op::Call => {
+                            let mut args = vec![lhs]; // function name should be the first vec member
+                            while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
+                                args.push(self.next_expr()?);
+                                if matches!(self.lexer.peek().kind, TokenKind::Comma) {
+                                    self.lexer.advance(); // step over comma
+                                    continue;
+                                }
+                            }
+                            self.lexer.advance(); // step over right paren
+                            Expr::Cons(Op::Call, args)
+                        }
+                        // Otherwise treat it like any other postfix operator
+                        _ => Expr::Cons(op, vec![lhs]),
+                    };
+                    // Continue to check the next operator
+                    continue;
                 }
-                self.lexer.advance();
-                let rhs = self.expr_bp(r_bp)?;
-                // What is built so far
-                lhs = Expr::Cons(op, vec![lhs, rhs]);
-                // Continue to check the next operator
-                continue;
-            } else if matches!(peeked.kind, TokenKind::RightParen) || peeked.is_eof() {
+
+                if let Some((l_bp, r_bp)) = op.infix_bp() {
+                    // If the next operator's left binding power is less than minimum, it is not strong
+                    // enough to bind the next atom, so we break and return lhs we've built so far
+                    if l_bp < min_bp {
+                        break;
+                    }
+                    self.lexer.advance();
+                    let rhs = self.expr_bp(r_bp)?;
+                    // What is built so far
+                    lhs = Expr::Cons(op, vec![lhs, rhs]);
+                    // Continue to check the next operator
+                    continue;
+                }
+            } else if matches!(peeked.kind, TokenKind::RightParen)
+                || peeked.is_eof()
+                || matches!(peeked.kind, TokenKind::Comma)
+            {
                 break;
             }
+            // else if matches!(peeked.kind, TokenKind::LeftParen) {
+            //     // Parse a function call
+            //     let mut args = vec![lhs];
+            //     while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
+            //         args.push(self.next_expr()?)
+            //     }
+            //     self.expect_token(TokenKind::RightParen)?;
+            //     lhs = Expr::Cons(Op::Call, args)
+            // }
 
             break;
         }
@@ -1126,6 +1174,57 @@ mod tests {
                             "i"
                         ))),])),
                     })
+                )
+            }
+        }
+
+        mod function_call {
+            use super::*;
+
+            #[test]
+            fn simple_call() {
+                let src = "fn_name()";
+                let mut parser = Parser::new(src);
+                let res = parser.next_expr().unwrap();
+                assert_eq!(
+                    res,
+                    Expr::Cons(Op::Call, vec![Expr::Atom(Atom::Ident("fn_name"))])
+                )
+            }
+
+            #[test]
+            fn call_with_argument() {
+                let src = "fn_name(10)";
+                let mut parser = Parser::new(src);
+                let res = parser.next_expr().unwrap();
+                assert_eq!(
+                    res,
+                    Expr::Cons(
+                        Op::Call,
+                        vec![
+                            Expr::Atom(Atom::Ident("fn_name"),),
+                            Expr::Atom(Atom::Number(10.0))
+                        ]
+                    )
+                )
+            }
+
+            #[test]
+            fn call_with_multiple_arguments() {
+                let src = "fn_name(10, \"a\", true)";
+                let mut parser = Parser::new(src);
+                let res = parser.next_expr().unwrap();
+                assert_eq!(
+                    res,
+                    Expr::Cons(
+                        Op::Call,
+                        vec![
+                            Expr::Atom(Atom::Ident("fn_name")),
+                            Expr::Atom(Atom::Number(10.0)),
+                            Expr::Atom(Atom::String("a")),
+                            Expr::Atom(Atom::Bool(true)),
+                        ]
+                    )
                 )
             }
         }
