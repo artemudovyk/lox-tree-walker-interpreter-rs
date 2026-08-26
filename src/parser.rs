@@ -19,6 +19,8 @@ pub enum ParseError {
     EmptyIfStatement { line: usize },
     #[error("[line {line}] Expected statement after while condition.")]
     EmptyWhileStatement { line: usize },
+    #[error("Too many arguments. Functions can't have more than 255 arguments.")]
+    TooManyArguments,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -494,6 +496,9 @@ impl<'src> Parser<'src> {
                                 if matches!(self.lexer.peek().kind, TokenKind::Comma) {
                                     self.lexer.advance(); // step over comma
                                     continue;
+                                }
+                                if args.len() >= 255 {
+                                    return Err(ParseError::TooManyArguments);
                                 }
                             }
                             self.lexer.advance(); // step over right paren
