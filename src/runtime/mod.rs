@@ -1,6 +1,12 @@
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
 use env::Env;
-use std::{borrow::Cow, cell::RefCell, io::Write, rc::Rc};
+use std::{
+    borrow::Cow,
+    cell::RefCell,
+    io::Write,
+    rc::Rc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 mod env;
 
@@ -218,9 +224,18 @@ impl<'src, W: Write> Runtime<'src, W> {
                         Ok(right)
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
-                }
-                Op::Call => {
-                    todo!()
+                    }
+                Op::Call => match args.as_slice() {
+                    [Expr::Atom(Atom::Ident(callee)), _args @ ..] => match *callee {
+                        "clock" => {
+                            let now = SystemTime::now()
+                                .duration_since(UNIX_EPOCH)
+                                .expect("Time went backwards").as_secs_f64();
+                            Ok(Value::Number(now))
+                        },
+                        _ => todo!(),
+                    }
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
                 }
             },
         }
@@ -921,6 +936,20 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "0\n1\n2\n");
+            }
+        }
+
+        mod function_call {
+            use super::*;
+
+            #[test]
+            fn built_in_clock_fn_returns_timestamp() {
+                let src = "print clock();";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert!(!actual.is_empty());
             }
         }
     }
