@@ -21,6 +21,8 @@ pub enum ParseError {
     EmptyWhileStatement { line: usize },
     #[error("Too many arguments. Functions can't have more than 255 arguments.")]
     TooManyArguments,
+    #[error("Missing comma between parameters in function declaration.")]
+    MissingCommaBetweenParameters,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -270,7 +272,7 @@ impl<'src> Parser<'src> {
         let token = self.lexer.next_token();
         if token.kind != token_kind {
             return Err(ParseError::ExpectedTokenNotFound(format!(
-                "[line {}] Error at {}: {}",
+                "[line {}] Error at '{}': {}",
                 token.line, token.lexeme, msg
             )));
         }
@@ -439,7 +441,12 @@ impl<'src> Parser<'src> {
                     while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
                         let t = self.lexer.next_token();
                         match t.kind {
-                            TokenKind::Ident => params.push(t.lexeme),
+                            TokenKind::Ident => {
+                                params.push(t.lexeme);
+                                if matches!(self.lexer.peek().kind, TokenKind::Ident) {
+                                    return Err(ParseError::MissingCommaBetweenParameters);
+                                }
+                            }
                             TokenKind::Comma => continue,
                             _ => panic!("Unexpected token"),
                         }
