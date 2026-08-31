@@ -47,6 +47,11 @@ pub enum Stmt<'src> {
         increment: Option<Expr<'src>>,
         body: Box<Stmt<'src>>,
     },
+    FunDecl {
+        ident: &'src str,
+        parameters: Vec<&'src str>,
+        body: Vec<Stmt<'src>>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -417,6 +422,20 @@ impl<'src> Parser<'src> {
                         initializer: initializer.map(Box::new),
                         condition: cond,
                         increment,
+                        body,
+                    }));
+                }
+                TokenKind::Keyword(Keyword::Fun) => {
+                    self.lexer.advance(); // skip over `fun` keyword
+                    let ident = self.expect_token(TokenKind::Ident)?.lexeme;
+                    self.expect_token(TokenKind::LeftParen)?;
+                    let params = vec![];
+                    self.expect_token(TokenKind::RightParen)?;
+                    self.expect_token(TokenKind::LeftBrace)?;
+                    let body = self.parse_block()?;
+                    return Ok(Some(Stmt::FunDecl {
+                        ident,
+                        parameters: params,
                         body,
                     }));
                 }
@@ -1233,5 +1252,24 @@ mod tests {
                 )
             }
         }
+    }
+
+    #[test]
+    fn parses_user_defined_func_with_no_parameters() {
+        let src = "
+            fun my_func() {
+                print 10;
+            }
+        ";
+        let mut parser = Parser::new(src);
+        let res = parser.next_stmt().unwrap();
+        assert_eq!(
+            res,
+            Some(Stmt::FunDecl {
+                ident: "my_func",
+                parameters: vec![],
+                body: vec![Stmt::Print(Expr::Atom(Atom::Number(10.0)))],
+            })
+        )
     }
 }

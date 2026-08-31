@@ -225,15 +225,45 @@ impl<'src, W: Write> Runtime<'src, W> {
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                     }
+                // TODO: when to check for arity? Not sure it can be done during parsing as the
+                // function declaration may be at the end of the file. But doing it in runtime seems
                 Op::Call => match args.as_slice() {
-                    [Expr::Atom(Atom::Ident(callee)), _args @ ..] => match *callee {
+                    // TODO: evaluate callee expr in case it's something that returns an identifier like
+                    // `outer()()` or `func_vec[1]()`.
+                    [Expr::Atom(Atom::Ident(callee)), args @ ..] => match *callee {
                         "clock" => {
                             let now = SystemTime::now()
                                 .duration_since(UNIX_EPOCH)
                                 .expect("Time went backwards").as_secs_f64();
                             Ok(Value::Number(now))
                         },
-                        _ => todo!(),
+                        func_name => {
+                            let val = self.env.borrow().get(func_name).unwrap();
+                            match val {
+                                Value::Func(func) => {
+                                    let prev_env = self.env.clone();
+
+                                    self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
+                                    if args.len() != func.parameters.len() {
+                                        panic!("Add error that args and params length unmatched");
+                                    }
+                                    for (param, arg) in func.parameters.iter().zip(args) {
+                                        let val = self.eval_expr(arg)?;
+                                        self.env.borrow_mut().set(param, val);
+                                    }
+
+                                    for stmt in func.body {
+                                        self.exec_stmt(stmt)?;
+                                    }
+
+                                    self.env = prev_env;
+
+                                    Ok(Value::Nil)
+                                }
+                                _ => panic!("Add error that the type in uncallable"),
+                            }
+
+                        }
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
                 }
@@ -308,6 +338,18 @@ impl<'src, W: Write> Runtime<'src, W> {
                     }
                 }
             }
+            Stmt::FunDecl {
+                ident,
+                parameters,
+                body,
+            } => self.env.borrow_mut().set(
+                ident,
+                Value::Func(Func {
+                    ident,
+                    parameters,
+                    body,
+                }),
+            ),
         }
         Ok(())
     }
@@ -328,15 +370,15 @@ pub enum Value<'src> {
     String(Cow<'src, str>),
     Bool(bool),
     Nil,
+    Func(Func<'src>),
 }
 
 impl<'src> Value<'src> {
     fn is_truthy(&self) -> bool {
         match self {
-            Self::Number(_) => true,
-            Self::String(_) => true,
             Self::Bool(bool) => *bool,
             Self::Nil => false,
+            _ => true,
         }
     }
 }
@@ -348,11 +390,17 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::String(s) => write!(f, "{}", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
+            Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
         }
     }
 }
 
-impl<'src> Stmt<'src> {}
+#[derive(Debug, Clone, PartialEq)]
+pub struct Func<'src> {
+    pub ident: &'src str,
+    pub parameters: Vec<&'src str>,
+    pub body: Vec<Stmt<'src>>,
+}
 
 #[cfg(test)]
 mod tests {
@@ -950,6 +998,21 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert!(!actual.is_empty());
+            }
+
+            #[test]
+            fn calls_declared_function() {
+                let src = "
+                    fun test_func() {
+                        print \"hello from test_func\";
+                    }
+                    test_func();
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "hello from test_func\n");
             }
         }
     }
