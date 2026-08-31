@@ -3,7 +3,7 @@ use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
 pub enum ParseError {
-    #[error("[line {line}] Error at '{lexeme}'. Expect expression.")]
+    #[error("[line {line}] Error at '{lexeme}': Expect expression.")]
     UnexpectedToken { line: usize, lexeme: String },
     #[error("[line {line}] Error at '{lexeme}'. Expect ')'.")]
     UnmatchedParen { line: usize, lexeme: String },
