@@ -390,7 +390,8 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::String(s) => write!(f, "{}", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
-            Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
+            // Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
+            Self::Func(func) => write!(f, "<fn {}>", func.ident),
         }
     }
 }
