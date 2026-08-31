@@ -255,6 +255,9 @@ impl<'src, W: Write> Runtime<'src, W> {
                                     let mut val = None;
                                     for stmt in func.body {
                                         val = self.exec_stmt(stmt)?;
+                                        if val.is_some() {
+                                            break;
+                                        }
                                     }
 
                                     self.env = prev_env;
@@ -273,32 +276,31 @@ impl<'src, W: Write> Runtime<'src, W> {
     }
 
     pub fn exec_stmt(&mut self, stmt: Stmt<'src>) -> Result<Option<Value<'src>>, RuntimeError> {
-        let value = match stmt {
+        match stmt {
             Stmt::Print(expr) => {
                 let val = self.eval_expr(&expr)?;
                 let _ = writeln!(self.out, "{}", val);
-                None
+                Ok(None)
             }
             Stmt::Expr(e) => {
                 self.eval_expr(&e)?;
-                None
+                Ok(None)
             }
             Stmt::Var { name, init_val } => {
                 let val = self.eval_expr(&init_val)?;
                 self.env.borrow_mut().set(name, val);
-                None
+                Ok(None)
             }
             Stmt::Block(statements) => {
                 let prev_env = self.env.clone();
                 self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
-
                 for stmt in statements {
-                    self.exec_stmt(stmt)?;
+                    if let Some(val) = self.exec_stmt(stmt)? {
+                        return Ok(Some(val));
+                    }
                 }
-
                 self.env = prev_env;
-
-                None
+                Ok(None)
             }
             Stmt::If {
                 condition,
@@ -306,11 +308,12 @@ impl<'src, W: Write> Runtime<'src, W> {
                 else_stmt,
             } => {
                 if self.eval_expr(&condition)?.is_truthy() {
-                    self.exec_stmt(*stmt)?;
+                    self.exec_stmt(*stmt)
                 } else if let Some(else_stmt) = else_stmt {
-                    self.exec_stmt(*else_stmt)?;
+                    self.exec_stmt(*else_stmt)
+                } else {
+                    Ok(None)
                 }
-                None
             }
             Stmt::While { condition, body } => {
                 loop {
@@ -323,7 +326,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                         break;
                     }
                 }
-                None
+                Ok(None)
             }
             Stmt::For {
                 initializer,
@@ -347,7 +350,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                         break;
                     }
                 }
-                None
+                Ok(None)
             }
             Stmt::FunDecl {
                 ident,
@@ -362,12 +365,10 @@ impl<'src, W: Write> Runtime<'src, W> {
                         body,
                     }),
                 );
-                None
+                Ok(None)
             }
-            Stmt::Return(expr) => Some(self.eval_expr(&expr)?),
-        };
-
-        Ok(value)
+            Stmt::Return(expr) => self.eval_expr(&expr).map(Option::from),
+        }
     }
 }
 
@@ -1043,6 +1044,43 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "10\n");
+            }
+
+            #[test]
+            fn func_does_not_execute_statements_after_returning() {
+                let src = "
+                    fun foo() {
+                        if (true) {
+                            return \"from if\";
+                        }
+                        return \"outside of if\";
+                    }
+                    print foo();    
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "from if\n");
+            }
+
+            #[test]
+            fn handles_recursive_calls_with_return_statements() {
+                let src = "
+                    fun fib(n) {
+                        if (n < 2) return n;
+                        return fib(n - 2) + fib(n - 1);
+                    }
+
+                    var start = clock();
+                    print fib(10) == 55;
+                    print (clock() - start) < 5; // 5 seconds
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "true\ntrue\n");
             }
         }
     }
