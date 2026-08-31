@@ -429,7 +429,15 @@ impl<'src> Parser<'src> {
                     self.lexer.advance(); // skip over `fun` keyword
                     let ident = self.expect_token(TokenKind::Ident)?.lexeme;
                     self.expect_token(TokenKind::LeftParen)?;
-                    let params = vec![];
+                    let mut params = vec![];
+                    while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
+                        let t = self.lexer.next_token();
+                        match t.kind {
+                            TokenKind::Ident => params.push(t.lexeme),
+                            TokenKind::Comma => continue,
+                            _ => panic!("Unexpected token"),
+                        }
+                    }
                     self.expect_token(TokenKind::RightParen)?;
                     self.expect_token(TokenKind::LeftBrace)?;
                     let body = self.parse_block()?;
@@ -1269,6 +1277,25 @@ mod tests {
                 ident: "my_func",
                 parameters: vec![],
                 body: vec![Stmt::Print(Expr::Atom(Atom::Number(10.0)))],
+            })
+        )
+    }
+
+    #[test]
+    fn parses_user_defined_func_with_params() {
+        let src = "
+            fun my_func(a, b, c) {
+                print a;
+            }
+        ";
+        let mut parser = Parser::new(src);
+        let res = parser.next_stmt().unwrap();
+        assert_eq!(
+            res,
+            Some(Stmt::FunDecl {
+                ident: "my_func",
+                parameters: vec!["a", "b", "c"],
+                body: vec![Stmt::Print(Expr::Atom(Atom::Ident("a")))],
             })
         )
     }
