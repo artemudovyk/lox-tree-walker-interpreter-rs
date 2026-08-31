@@ -252,13 +252,14 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         self.env.borrow_mut().set(param, val);
                                     }
 
+                                    let mut val = None;
                                     for stmt in func.body {
-                                        self.exec_stmt(stmt)?;
+                                        val = self.exec_stmt(stmt)?;
                                     }
 
                                     self.env = prev_env;
 
-                                    Ok(Value::Nil)
+                                    Ok(val.unwrap_or(Value::Nil))
                                 }
                                 _ => panic!("Add error that the type in uncallable"),
                             }
@@ -271,18 +272,21 @@ impl<'src, W: Write> Runtime<'src, W> {
         }
     }
 
-    pub fn exec_stmt(&mut self, stmt: Stmt<'src>) -> Result<(), RuntimeError> {
-        match stmt {
+    pub fn exec_stmt(&mut self, stmt: Stmt<'src>) -> Result<Option<Value<'src>>, RuntimeError> {
+        let value = match stmt {
             Stmt::Print(expr) => {
                 let val = self.eval_expr(&expr)?;
                 let _ = writeln!(self.out, "{}", val);
+                None
             }
             Stmt::Expr(e) => {
                 self.eval_expr(&e)?;
+                None
             }
             Stmt::Var { name, init_val } => {
                 let val = self.eval_expr(&init_val)?;
                 self.env.borrow_mut().set(name, val);
+                None
             }
             Stmt::Block(statements) => {
                 let prev_env = self.env.clone();
@@ -293,6 +297,8 @@ impl<'src, W: Write> Runtime<'src, W> {
                 }
 
                 self.env = prev_env;
+
+                None
             }
             Stmt::If {
                 condition,
@@ -300,21 +306,25 @@ impl<'src, W: Write> Runtime<'src, W> {
                 else_stmt,
             } => {
                 if self.eval_expr(&condition)?.is_truthy() {
-                    self.exec_stmt(*stmt)?
+                    self.exec_stmt(*stmt)?;
                 } else if let Some(else_stmt) = else_stmt {
-                    self.exec_stmt(*else_stmt)?
+                    self.exec_stmt(*else_stmt)?;
                 }
+                None
             }
-            Stmt::While { condition, body } => loop {
-                if self.eval_expr(&condition)?.is_truthy() {
-                    match *body.clone() {
-                        block @ Stmt::Block(_) => self.exec_stmt(block)?,
-                        stmt => self.exec_stmt(stmt.clone())?,
+            Stmt::While { condition, body } => {
+                loop {
+                    if self.eval_expr(&condition)?.is_truthy() {
+                        match *body.clone() {
+                            block @ Stmt::Block(_) => self.exec_stmt(block)?,
+                            stmt => self.exec_stmt(stmt.clone())?,
+                        };
+                    } else {
+                        break;
                     }
-                } else {
-                    break;
                 }
-            },
+                None
+            }
             Stmt::For {
                 initializer,
                 condition,
@@ -329,7 +339,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                         match *body.clone() {
                             block @ Stmt::Block(_) => self.exec_stmt(block)?,
                             stmt => self.exec_stmt(stmt.clone())?,
-                        }
+                        };
                         if let Some(incr_expr) = &increment {
                             self.eval_expr(incr_expr)?;
                         }
@@ -337,21 +347,27 @@ impl<'src, W: Write> Runtime<'src, W> {
                         break;
                     }
                 }
+                None
             }
             Stmt::FunDecl {
                 ident,
                 parameters,
                 body,
-            } => self.env.borrow_mut().set(
-                ident,
-                Value::Func(Func {
+            } => {
+                self.env.borrow_mut().set(
                     ident,
-                    parameters,
-                    body,
-                }),
-            ),
-        }
-        Ok(())
+                    Value::Func(Func {
+                        ident,
+                        parameters,
+                        body,
+                    }),
+                );
+                None
+            }
+            Stmt::Return(expr) => Some(self.eval_expr(&expr)?),
+        };
+
+        Ok(value)
     }
 }
 
@@ -1014,6 +1030,19 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "hello from test_func\n");
+            }
+
+            #[test]
+            fn func_invocation_produces_a_value_returned_from_func_body() {
+                let src = "
+                    fun foo() { return 10; }
+                    print foo();    
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "10\n");
             }
         }
     }

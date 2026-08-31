@@ -22,7 +22,7 @@ impl<'src> Env<'src> {
         }
     }
 
-    pub fn to_outer(self) -> Rc<RefCell<Self>> {
+    fn to_outer(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))
     }
 

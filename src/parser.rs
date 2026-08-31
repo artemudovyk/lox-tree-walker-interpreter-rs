@@ -49,6 +49,7 @@ pub enum Stmt<'src> {
         increment: Option<Expr<'src>>,
         body: Box<Stmt<'src>>,
     },
+    Return(Expr<'src>),
     FunDecl {
         ident: &'src str,
         parameters: Vec<&'src str>,
@@ -459,6 +460,12 @@ impl<'src> Parser<'src> {
                         parameters: params,
                         body,
                     }));
+                }
+                TokenKind::Keyword(Keyword::Return) => {
+                    self.lexer.advance();
+                    let expr = self.next_expr()?;
+                    self.expect_token(TokenKind::Semicolon, "Expect ';'.")?;
+                    return Ok(Some(Stmt::Return(expr)));
                 }
                 TokenKind::LeftBrace => {
                     self.lexer.advance();
@@ -1309,6 +1316,25 @@ mod tests {
                 ident: "my_func",
                 parameters: vec!["a", "b", "c"],
                 body: vec![Stmt::Print(Expr::Atom(Atom::Ident("a")))],
+            })
+        )
+    }
+
+    #[test]
+    fn parses_return_statement() {
+        let src = "
+            fun my_func() {
+                return 10;
+            }
+        ";
+        let mut parser = Parser::new(src);
+        let res = parser.next_stmt().unwrap();
+        assert_eq!(
+            res,
+            Some(Stmt::FunDecl {
+                ident: "my_func",
+                parameters: vec![],
+                body: vec![Stmt::Return(Expr::Atom(Atom::Number(10.0)))],
             })
         )
     }
