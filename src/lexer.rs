@@ -55,6 +55,40 @@ pub enum TokenKind<'src> {
     Eof,
 }
 
+impl std::fmt::Display for TokenKind<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LeftParen => write!(f, "("),
+            Self::RightParen => write!(f, ")"),
+            Self::LeftBrace => write!(f, "{{"),
+            Self::RightBrace => write!(f, "}}"),
+            Self::Comma => write!(f, ","),
+            Self::Dot => write!(f, "."),
+            Self::Minus => write!(f, "-"),
+            Self::Plus => write!(f, "+"),
+            Self::Semicolon => write!(f, ";"),
+            Self::Star => write!(f, "*"),
+            Self::Eq => write!(f, "="),
+            Self::EqEq => write!(f, "=="),
+            Self::Bang => write!(f, "!"),
+            Self::BangEq => write!(f, "!="),
+            Self::Less => write!(f, "<"),
+            Self::LessEqual => write!(f, "<="),
+            Self::Greater => write!(f, ">"),
+            Self::GreaterEqual => write!(f, ">="),
+            Self::Slash => write!(f, "/"),
+            Self::Comment => write!(f, "//"),
+            Self::Ident => write!(f, "identifier"),
+            Self::Whitespace => write!(f, "whitespace"),
+            // TODO: change to display impl
+            Self::Literal(literal) => write!(f, "{:?}", literal),
+            Self::Keyword(keyword) => write!(f, "{:?}", keyword),
+            Self::Unknown { .. } => write!(f, "unkown"),
+            Self::Eof => write!(f, "<EOF>"),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'src> {
     String { s: &'src str, terminated: bool },

@@ -262,12 +262,16 @@ impl<'src> Parser<'src> {
         );
     }
 
-    fn expect_token(&mut self, token_kind: TokenKind<'src>) -> Result<Token<'src>, ParseError> {
+    fn expect_token(
+        &mut self,
+        token_kind: TokenKind<'src>,
+        msg: &str,
+    ) -> Result<Token<'src>, ParseError> {
         let token = self.lexer.next_token();
         if token.kind != token_kind {
             return Err(ParseError::ExpectedTokenNotFound(format!(
-                "Expected {:?} token, but got {:?}.",
-                token_kind, token.kind
+                "[line {}] Error at {}: {}",
+                token.line, token.lexeme, msg
             )));
         }
         Ok(token)
@@ -303,12 +307,12 @@ impl<'src> Parser<'src> {
                 TokenKind::Keyword(Keyword::Print) => {
                     self.lexer.advance(); // Consume `print` keyword
                     let expr = self.next_expr()?;
-                    self.assert_semicolon();
+                    self.expect_token(TokenKind::Semicolon, "Expect expression.")?;
                     return Ok(Some(Stmt::Print(expr)));
                 }
                 TokenKind::Keyword(Keyword::Var) => {
                     self.lexer.advance(); // Consume `var` keyword
-                    let ident = self.expect_token(TokenKind::Ident)?;
+                    let ident = self.expect_token(TokenKind::Ident, "Expect identifier.")?;
                     let init_val = match self.lexer.peek().kind {
                         TokenKind::Eq => {
                             self.lexer.advance();
@@ -320,7 +324,7 @@ impl<'src> Parser<'src> {
                             lexeme: self.lexer.peek().lexeme.to_owned(),
                         })?,
                     };
-                    self.assert_semicolon();
+                    self.expect_token(TokenKind::Semicolon, "Expect ';'.")?;
                     return Ok(Some(Stmt::Var {
                         name: ident.lexeme,
                         init_val,
@@ -328,9 +332,9 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::If) => {
                     self.lexer.advance();
-                    self.expect_token(TokenKind::LeftParen)?;
+                    self.expect_token(TokenKind::LeftParen, "Expect '('.")?;
                     let cond = self.next_expr()?;
-                    self.expect_token(TokenKind::RightParen)?;
+                    self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
                     let stmt = match self.lexer.peek().kind {
                         TokenKind::LeftBrace => {
                             self.lexer.advance();
@@ -366,9 +370,9 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::While) => {
                     self.lexer.advance();
-                    self.expect_token(TokenKind::LeftParen)?;
+                    self.expect_token(TokenKind::LeftParen, "Expect '('.")?;
                     let cond = self.next_expr()?;
-                    self.expect_token(TokenKind::RightParen)?;
+                    self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
                     let body = match self.lexer.peek().kind {
                         TokenKind::LeftBrace => {
                             self.lexer.advance();
@@ -389,7 +393,7 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::For) => {
                     self.lexer.advance();
-                    self.expect_token(TokenKind::LeftParen)?;
+                    self.expect_token(TokenKind::LeftParen, "Expect '('.")?;
                     let initializer = match self.lexer.peek().kind {
                         TokenKind::Semicolon => {
                             self.lexer.advance();
@@ -398,12 +402,12 @@ impl<'src> Parser<'src> {
                         _ => Some(self.next_stmt()?.expect("Expect a statement")),
                     };
                     let cond = self.next_expr()?;
-                    self.assert_semicolon();
+                    self.expect_token(TokenKind::Semicolon, "Expect ';'.")?;
                     let increment = match self.lexer.peek().kind {
                         TokenKind::RightParen => None,
                         _ => Some(self.next_expr()?),
                     };
-                    self.expect_token(TokenKind::RightParen)?;
+                    self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
                     let body = match self.lexer.peek().kind {
                         TokenKind::LeftBrace => {
                             self.lexer.advance();
@@ -427,8 +431,10 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::Fun) => {
                     self.lexer.advance(); // skip over `fun` keyword
-                    let ident = self.expect_token(TokenKind::Ident)?.lexeme;
-                    self.expect_token(TokenKind::LeftParen)?;
+                    let ident = self
+                        .expect_token(TokenKind::Ident, "Expect identifier.")?
+                        .lexeme;
+                    self.expect_token(TokenKind::LeftParen, "Expect a '('.")?;
                     let mut params = vec![];
                     while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
                         let t = self.lexer.next_token();
@@ -438,8 +444,8 @@ impl<'src> Parser<'src> {
                             _ => panic!("Unexpected token"),
                         }
                     }
-                    self.expect_token(TokenKind::RightParen)?;
-                    self.expect_token(TokenKind::LeftBrace)?;
+                    self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
+                    self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
                     let body = self.parse_block()?;
                     return Ok(Some(Stmt::FunDecl {
                         ident,
@@ -460,7 +466,7 @@ impl<'src> Parser<'src> {
                 // Fallback to expression statement;
                 _ => {
                     let expr = self.expr_bp(0)?;
-                    self.assert_semicolon();
+                    self.expect_token(TokenKind::Semicolon, "Expect ';'.")?;
                     return Ok(Some(Stmt::Expr(expr)));
                 }
             }

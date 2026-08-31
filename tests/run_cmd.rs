@@ -7,7 +7,6 @@ fn shows_error_for_unterminated_parens_function_call() {
     let cases = [
         ("clock(;", "Error at ';': Expect expression."),
         ("print clock(;", "Error at ';': Expect expression."),
-        // ("print clock)));", "Error at ')': Expect ';' after value."),
     ];
 
     for (src, expected_err_predicate) in cases {
