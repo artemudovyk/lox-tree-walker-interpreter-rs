@@ -36,8 +36,31 @@ fn compile_error_on_missing_comma_between_func_parameters() {
         .arg(file.path())
         .assert()
         .failure()
-        .append_context("source", src)
         .stderr(predicate::str::contains(
             "Missing comma between parameters in function declaration.",
         ));
+}
+
+#[test]
+fn closure() {
+    let src = "
+        fun makeGreeter() {
+          fun greet(name) {
+            print \"Hello \" + name;
+          }
+          return greet;
+        }
+
+        var sayHello = makeGreeter();
+        sayHello(\"Bob\");
+    ";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Hello Bob"));
 }
