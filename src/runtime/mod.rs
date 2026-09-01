@@ -376,7 +376,10 @@ impl<'src, W: Write> Runtime<'src, W> {
                 );
                 Ok(None)
             }
-            Stmt::Return(expr) => self.eval_expr(&expr).map(Option::from),
+            Stmt::Return(expr) => match expr {
+                Some(expr) => self.eval_expr(&expr).map(Option::from),
+                None => Ok(Some(Value::Nil)),
+            },
         }
     }
 }
@@ -1105,6 +1108,23 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "ok\n");
+            }
+
+            #[test]
+            fn returns_nil_from_func_if_skipped_expr_after_return_keyword() {
+                let src = "
+                    fun f() {
+                        return;
+                        print \"bad\";
+                    }
+                 
+                    print f();
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "nil\n");
             }
         }
     }
