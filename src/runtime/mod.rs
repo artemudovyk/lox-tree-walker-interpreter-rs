@@ -294,13 +294,14 @@ impl<'src, W: Write> Runtime<'src, W> {
             Stmt::Block(statements) => {
                 let prev_env = self.env.clone();
                 self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
+                let mut value = None;
                 for stmt in statements {
-                    if let Some(val) = self.exec_stmt(stmt)? {
-                        return Ok(Some(val));
+                    if let Some(v) = self.exec_stmt(stmt)? {
+                        value = Some(v);
                     }
                 }
                 self.env = prev_env;
-                Ok(None)
+                Ok(value)
             }
             Stmt::If {
                 condition,
@@ -319,8 +320,16 @@ impl<'src, W: Write> Runtime<'src, W> {
                 loop {
                     if self.eval_expr(&condition)?.is_truthy() {
                         match *body.clone() {
-                            block @ Stmt::Block(_) => self.exec_stmt(block)?,
-                            stmt => self.exec_stmt(stmt.clone())?,
+                            block @ Stmt::Block(_) => {
+                                if let Some(val) = self.exec_stmt(block)? {
+                                    return Ok(Some(val));
+                                }
+                            }
+                            stmt => {
+                                if let Some(val) = self.exec_stmt(stmt.clone())? {
+                                    return Ok(Some(val));
+                                }
+                            }
                         };
                     } else {
                         break;
@@ -1081,6 +1090,21 @@ mod tests {
                 runtime.run(src).unwrap();
                 let actual = std::str::from_utf8(&buf).unwrap();
                 assert_eq!(actual, "true\ntrue\n");
+            }
+
+            #[test]
+            fn returns_from_while_block() {
+                let src = "
+                    fun f() {
+                        while (!false) return \"ok\";
+                    }
+                    print f();
+                ";
+                let mut buf = Vec::new();
+                let mut runtime = Runtime::with_out(&mut buf);
+                runtime.run(src).unwrap();
+                let actual = std::str::from_utf8(&buf).unwrap();
+                assert_eq!(actual, "ok\n");
             }
         }
     }
