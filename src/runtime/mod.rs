@@ -25,11 +25,26 @@ pub struct Runtime<'src, W: Write> {
     env: Rc<RefCell<Env<'src>>>,
 }
 
+impl<'src> Runtime<'src, std::io::Stdout> {
+    pub fn new() -> Self {
+        let mut env = Env::new();
+        env.set("clock", Value::NativeFunc(NativeFunc::Clock));
+
+        Self {
+            out: std::io::stdout(),
+            env: Rc::new(RefCell::new(env)),
+        }
+    }
+}
+
 impl<'src, W: Write> Runtime<'src, W> {
     pub fn with_out(writer: W) -> Self {
+        let mut env = Env::new();
+        env.set("clock", Value::NativeFunc(NativeFunc::Clock));
+
         Self {
             out: writer,
-            env: Rc::new(RefCell::new(Env::new())),
+            env: Rc::new(RefCell::new(env)),
         }
     }
 
@@ -228,46 +243,39 @@ impl<'src, W: Write> Runtime<'src, W> {
                 // TODO: when to check for arity? Not sure it can be done during parsing as the
                 // function declaration may be at the end of the file. But doing it in runtime seems
                 Op::Call => match args.as_slice() {
-                    // TODO: evaluate callee expr in case it's something that returns an identifier like
-                    // `outer()()` or `func_vec[1]()`.
-                    [Expr::Atom(Atom::Ident(callee)), args @ ..] => match *callee {
-                        "clock" => {
+                    [callee, args @ ..] => match self.eval_expr(callee)? {
+                        Value::NativeFunc(NativeFunc::Clock) => {
                             let now = SystemTime::now()
                                 .duration_since(UNIX_EPOCH)
                                 .expect("Time went backwards").as_secs_f64();
                             Ok(Value::Number(now))
                         },
-                        func_name => {
-                            let val = self.env.borrow().get(func_name).unwrap();
-                            match val {
-                                Value::Func(func) => {
-                                    let prev_env = self.env.clone();
+                        Value::Func(func) => {
+                            // let val = self.env.borrow().get(ident).unwrap();
+                                let prev_env = self.env.clone();
 
-                                    self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
-                                    if args.len() != func.parameters.len() {
-                                        panic!("Add error that args and params length unmatched");
-                                    }
-                                    for (param, arg) in func.parameters.iter().zip(args) {
-                                        let val = self.eval_expr(arg)?;
-                                        self.env.borrow_mut().set(param, val);
-                                    }
-
-                                    let mut val = None;
-                                    for stmt in func.body {
-                                        val = self.exec_stmt(stmt)?;
-                                        if val.is_some() {
-                                            break;
-                                        }
-                                    }
-
-                                    self.env = prev_env;
-
-                                    Ok(val.unwrap_or(Value::Nil))
+                                self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
+                                if args.len() != func.parameters.len() {
+                                    panic!("Add error that args and params length unmatched");
                                 }
-                                _ => panic!("Add error that the type in uncallable"),
-                            }
+                                for (param, arg) in func.parameters.iter().zip(args) {
+                                    let val = self.eval_expr(arg)?;
+                                    self.env.borrow_mut().set(param, val);
+                                }
 
+                                let mut val = None;
+                                for stmt in func.body {
+                                    val = self.exec_stmt(stmt)?;
+                                    if val.is_some() {
+                                        break;
+                                    }
+                                }
+
+                                self.env = prev_env;
+
+                                Ok(val.unwrap_or(Value::Nil))
                         }
+                        _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
                 }
@@ -386,10 +394,7 @@ impl<'src, W: Write> Runtime<'src, W> {
 
 impl Default for Runtime<'_, std::io::Stdout> {
     fn default() -> Self {
-        Self {
-            out: std::io::stdout(),
-            env: Rc::new(RefCell::new(Env::new())),
-        }
+        Self::new()
     }
 }
 
@@ -400,6 +405,7 @@ pub enum Value<'src> {
     Bool(bool),
     Nil,
     Func(Func<'src>),
+    NativeFunc(NativeFunc),
 }
 
 impl<'src> Value<'src> {
@@ -421,6 +427,7 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::Nil => write!(f, "nil"),
             // Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
+            Self::NativeFunc(func) => write!(f, "<fn {}>", func),
         }
     }
 }
@@ -430,6 +437,19 @@ pub struct Func<'src> {
     pub ident: &'src str,
     pub parameters: Vec<&'src str>,
     pub body: Vec<Stmt<'src>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum NativeFunc {
+    Clock,
+}
+
+impl std::fmt::Display for NativeFunc {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Clock => write!(f, "clock"),
+        }
+    }
 }
 
 #[cfg(test)]
