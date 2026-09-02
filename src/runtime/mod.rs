@@ -276,7 +276,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                             let args = args.iter().map(|arg| self.eval_expr(arg)).collect::<Result<Vec<_>, _>>()?;
                             self.env = Rc::new(RefCell::new(Env::from_closure(func.closure.clone())));
                             for (param, arg) in func.parameters.iter().zip(args) {
-                                dbg!(&param, &arg);
                                 self.env.borrow_mut().set(param, arg);
                             }
 
