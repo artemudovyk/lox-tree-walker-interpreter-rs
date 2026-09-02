@@ -261,7 +261,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                         Value::Func(func) => {
                             let prev_env = self.env.clone();
 
-                            self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
                             if args.len() != func.parameters.len() {
                                 return Err(RuntimeError::UnexpectedArgsNum {
                                     func: func.ident.to_owned(),
@@ -269,9 +268,16 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         got_args_num: args.len() as u16,
                                 });
                             }
+                            // Evaluate all expressions first before swapping the environment to
+                            // properly handle recursive calls where the var from the current env
+                            // could be used as an argument for a nested call. If we'd swap
+                            // environment before evaluating all args to the final value, it would
+                            // lead to unexpected calculations.
+                            let args = args.iter().map(|arg| self.eval_expr(arg)).collect::<Result<Vec<_>, _>>()?;
+                            self.env = Rc::new(RefCell::new(Env::from_closure(func.closure.clone())));
                             for (param, arg) in func.parameters.iter().zip(args) {
-                                let val = self.eval_expr(arg)?;
-                                self.env.borrow_mut().set(param, val);
+                                dbg!(&param, &arg);
+                                self.env.borrow_mut().set(param, arg);
                             }
 
                             let mut val = None;
@@ -385,14 +391,14 @@ impl<'src, W: Write> Runtime<'src, W> {
                 parameters,
                 body,
             } => {
-                self.env.borrow_mut().set(
+                let func = Value::Func(Func {
                     ident,
-                    Value::Func(Func {
-                        ident,
-                        parameters,
-                        body,
-                    }),
-                );
+                    parameters,
+                    body,
+                    // Capture current environment
+                    closure: self.env.clone(),
+                });
+                self.env.borrow_mut().set(ident, func);
                 Ok(None)
             }
             Stmt::Return(expr) => match expr {
@@ -448,6 +454,7 @@ pub struct Func<'src> {
     pub ident: &'src str,
     pub parameters: Vec<&'src str>,
     pub body: Vec<Stmt<'src>>,
+    pub closure: Rc<RefCell<Env<'src>>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

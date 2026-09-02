@@ -129,3 +129,89 @@ fn local_function_scope_works_as_expected() {
         .success()
         .stdout(predicate::str::contains("38\n68\n95\n"));
 }
+
+#[test]
+fn variable_scoping_works_as_expected() {
+    let src = "
+        // This program tests variable scoping and
+        // shadowing in Lox. It demonstrates:
+        // Global variable declarations
+        // Function scope access to global variables
+        // Block scoping with local variables shadowing
+        // outer variables
+        // Verification that global variables remain
+        // unchanged after shadowing
+        var x = 1;
+        var y = 2;
+
+        fun printBoth() {
+            if (x < y) {
+                print \"x is less than y:\";
+                print x;
+                print y;
+            } else {
+                print \"x is not less than y:\";
+                print x;
+                print y;
+            }
+        }
+
+        {
+            var x = 10;
+            {
+                var y = 20;
+
+                var i = 0;
+                while (i < 3) {
+                    x = x + 1;
+                    y = y - 1;
+                    print \"Local x: \";
+                    print x;
+                    print \"Local y: \";
+                    print y;
+                    i = i + 1;
+                }
+
+                if (x > y) {
+                    print \"Local x > y\";
+                }
+
+                printBoth();
+            }
+        }
+
+        if (x == 1 and y == 2) {
+            print \"Globals unchanged:\";
+            printBoth();
+        }
+    ";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Local x: 
+11
+Local y: 
+19
+Local x: 
+12
+Local y: 
+18
+Local x: 
+13
+Local y: 
+17
+x is less than y:
+1
+2
+Globals unchanged:
+x is less than y:
+1
+2",
+        ));
+}

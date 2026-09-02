@@ -1,7 +1,7 @@
 use super::{RuntimeError, Value};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Env<'src> {
     map: HashMap<&'src str, Value<'src>>,
     outer: Option<Rc<RefCell<Env<'src>>>>,
@@ -12,6 +12,14 @@ impl<'src> Env<'src> {
         Self {
             map: HashMap::new(),
             outer: None,
+        }
+    }
+
+    // TODO: same as new_with_outer
+    pub fn from_closure(closure: Rc<RefCell<Self>>) -> Self {
+        Self {
+            map: HashMap::new(),
+            outer: Some(closure),
         }
     }
 
