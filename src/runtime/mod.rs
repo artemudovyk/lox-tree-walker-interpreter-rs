@@ -20,6 +20,14 @@ pub enum RuntimeError {
     UndeclaredVar(String),
     #[error("Can only call functions and classes.")]
     UncallableType,
+    #[error(
+        "Function '{func}' called with unexpected number of arguments. Expected {expected_args_num} arguments, but got {got_args_num}."
+    )]
+    UnexpectedArgsNum {
+        func: String,
+        expected_args_num: u16,
+        got_args_num: u16,
+    },
 }
 
 pub struct Runtime<'src, W: Write> {
@@ -242,8 +250,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                     }
-                // TODO: when to check for arity? Not sure it can be done during parsing as the
-                // function declaration may be at the end of the file. But doing it in runtime seems
                 Op::Call => match args.as_slice() {
                     [callee, args @ ..] => match self.eval_expr(callee)? {
                         Value::NativeFunc(NativeFunc::Clock) => {
@@ -253,29 +259,32 @@ impl<'src, W: Write> Runtime<'src, W> {
                             Ok(Value::Number(now))
                         },
                         Value::Func(func) => {
-                            // let val = self.env.borrow().get(ident).unwrap();
-                                let prev_env = self.env.clone();
+                            let prev_env = self.env.clone();
 
-                                self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
-                                if args.len() != func.parameters.len() {
-                                    panic!("Add error that args and params length unmatched");
+                            self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
+                            if args.len() != func.parameters.len() {
+                                return Err(RuntimeError::UnexpectedArgsNum {
+                                    func: func.ident.to_owned(),
+                                    expected_args_num: func.parameters.len() as u16,
+                                        got_args_num: args.len() as u16,
+                                });
+                            }
+                            for (param, arg) in func.parameters.iter().zip(args) {
+                                let val = self.eval_expr(arg)?;
+                                self.env.borrow_mut().set(param, val);
+                            }
+
+                            let mut val = None;
+                            for stmt in func.body {
+                                val = self.exec_stmt(stmt)?;
+                                if val.is_some() {
+                                    break;
                                 }
-                                for (param, arg) in func.parameters.iter().zip(args) {
-                                    let val = self.eval_expr(arg)?;
-                                    self.env.borrow_mut().set(param, val);
-                                }
+                            }
 
-                                let mut val = None;
-                                for stmt in func.body {
-                                    val = self.exec_stmt(stmt)?;
-                                    if val.is_some() {
-                                        break;
-                                    }
-                                }
+                            self.env = prev_env;
 
-                                self.env = prev_env;
-
-                                Ok(val.unwrap_or(Value::Nil))
+                            Ok(val.unwrap_or(Value::Nil))
                         }
                         _ => Err(RuntimeError::UncallableType),
                     }

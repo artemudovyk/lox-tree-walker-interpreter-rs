@@ -80,3 +80,26 @@ fn error_when_uncallable_type_called() {
             "Can only call functions and classes.",
         ));
 }
+
+#[test]
+fn error_when_func_called_with_too_many_arguments() {
+    let src = "
+        fun f(a, b) {
+            print a;
+            print b;
+        }
+
+        f(1, 2, 3, 4);
+    ";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Function \'f\' called with unexpected number of arguments",
+        ));
+}
