@@ -18,6 +18,8 @@ pub enum RuntimeError {
     ParseError(#[from] ParseError),
     #[error("variable {0} is undeclared")]
     UndeclaredVar(String),
+    #[error("Can only call functions and classes.")]
+    UncallableType,
 }
 
 pub struct Runtime<'src, W: Write> {
@@ -275,7 +277,7 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                                 Ok(val.unwrap_or(Value::Nil))
                         }
-                        _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
+                        _ => Err(RuntimeError::UncallableType),
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
                 }

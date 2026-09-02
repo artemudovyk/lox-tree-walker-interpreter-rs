@@ -64,3 +64,19 @@ fn closure() {
         .success()
         .stdout(predicate::str::contains("Hello Bob"));
 }
+
+#[test]
+fn error_when_uncallable_type_called() {
+    let src = "85();";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Can only call functions and classes.",
+        ));
+}
