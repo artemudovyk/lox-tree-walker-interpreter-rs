@@ -103,3 +103,29 @@ fn error_when_func_called_with_too_many_arguments() {
             "Function \'f\' called with unexpected number of arguments",
         ));
 }
+
+#[test]
+fn local_function_scope_works_as_expected() {
+    let src = "
+        var a = 38;
+
+        fun printAndModify() {
+            print a;
+            var a = 95;
+            print a;
+        }
+
+        print a;
+        a = 68;
+        printAndModify();
+    ";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("38\n68\n95\n"));
+}
