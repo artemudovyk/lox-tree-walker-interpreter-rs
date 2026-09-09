@@ -1,5 +1,5 @@
 {
-  description = "Monorepo dev environment for Rust, SvelteKit, and Terraform";
+  description = "Codecrafters Interpreter Rust dev env";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
@@ -22,6 +22,7 @@
           buildInputs = with pkgs; [
             rustc
             cargo
+            cargo-nextest
             rustfmt
             clippy
             rust-analyzer
