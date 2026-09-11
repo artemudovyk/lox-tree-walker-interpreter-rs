@@ -32,17 +32,15 @@
       in
       {
         devShells.default = pkgs.mkShell {
-          nativeBuildInputs = [
-            pkgs.rust-bin.stable.latest.default
-            pkgs.pkg-config
+          nativeBuildInputs = with pkgs; [
+            rust-bin.stable.latest.default
+            pkg-config
+            cargo-nextest
           ];
 
-          depsBuildBuild = [
-          ];
+          depsBuildBuild = [ ];
 
-          buildInputs = [
-            pkgs.openssl
-          ];
+          buildInputs = [ ];
         };
       }
     );
