@@ -30,7 +30,8 @@ impl<'src> Env<'src> {
         }
     }
 
-    fn to_outer(self) -> Rc<RefCell<Self>> {
+    #[allow(dead_code)]
+    fn into_outer(self) -> Rc<RefCell<Self>> {
         Rc::new(RefCell::new(self))
     }
 
@@ -60,6 +61,12 @@ impl<'src> Env<'src> {
     }
 }
 
+impl<'src> Default for Env<'src> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -74,7 +81,7 @@ mod tests {
 
     #[test]
     fn returns_value_from_outer_env_if_not_present_in_local() {
-        let outer = Env::new().to_outer();
+        let outer = Env::new().into_outer();
         outer.borrow_mut().set("test", Value::Bool(true));
         let inner = Env::new_with_outer(outer.clone());
         let res = inner.get("test");
@@ -83,7 +90,7 @@ mod tests {
 
     #[test]
     fn update_changes_local_variable_but_not_overshadowed_from_outer() {
-        let outer = Env::new().to_outer();
+        let outer = Env::new().into_outer();
         outer.borrow_mut().set("test", Value::Number(1.0));
         let mut inner = Env::new_with_outer(outer.clone());
         inner.set("test", Value::Number(2.0));
@@ -96,7 +103,7 @@ mod tests {
 
     #[test]
     fn update_changes_outer_var_if_no_local_overshadowing_present() {
-        let outer = Env::new().to_outer();
+        let outer = Env::new().into_outer();
         outer.borrow_mut().set("test", Value::Number(1.0));
         let mut inner = Env::new_with_outer(outer.clone());
 
