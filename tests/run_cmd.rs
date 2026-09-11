@@ -215,3 +215,29 @@ x is less than y:
 2",
         ));
 }
+
+#[test]
+fn uses_proper_binded_var_for_the_captured_scope() {
+    let src = "
+        var variable = \"global\";
+
+        {
+          fun f() {
+            print variable;
+          }
+
+          f();
+          var variable = \"local\";
+          f();
+        }
+    ";
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("global\nglobal\n"));
+}

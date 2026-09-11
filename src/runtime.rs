@@ -1,5 +1,5 @@
+use crate::environment::Env;
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
-use env::Env;
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -7,8 +7,6 @@ use std::{
     rc::Rc,
     time::{SystemTime, UNIX_EPOCH},
 };
-
-mod env;
 
 #[derive(Debug, PartialEq, thiserror::Error)]
 pub enum RuntimeError {
