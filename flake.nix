@@ -1,32 +1,47 @@
 {
-  description = "Codecrafters Interpreter Rust dev env";
-
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
-    flake-utils.url = "github:numtide/flake-utils";
+    nixpkgs.url = "github:nixos/nixpkgs/nixos-unstable";
+    rust-overlay = {
+      url = "github:oxalica/rust-overlay";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
-    {
-      self,
-      nixpkgs,
-      flake-utils,
-    }:
-    flake-utils.lib.eachDefaultSystem (
+    inputs:
+    let
+      systems = [
+        "x86_64-linux"
+      ];
+
+      # Allows to re-configure default nixpkgs
+      eachSystem =
+        systems: f:
+        builtins.foldl' (
+          a: s: a // builtins.mapAttrs (k: v: (a.${k} or { }) // { ${s} = v; }) (f s)
+        ) { } systems;
+    in
+    eachSystem systems (
       system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        overlays = [ (import inputs.rust-overlay) ];
+        pkgs = import inputs.nixpkgs {
+          inherit system overlays;
+          config.allowUnfree = true;
+        };
       in
       {
         devShells.default = pkgs.mkShell {
-          buildInputs = with pkgs; [
-            rustc
-            cargo
-            cargo-nextest
-            rustfmt
-            clippy
-            rust-analyzer
-            pkg-config
+          nativeBuildInputs = [
+            pkgs.rust-bin.stable.latest.default
+            pkgs.pkg-config
+          ];
+
+          depsBuildBuild = [
+          ];
+
+          buildInputs = [
+            pkgs.openssl
           ];
         };
       }
