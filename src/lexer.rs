@@ -121,24 +121,27 @@ pub struct Token<'src> {
     pub lexeme: &'src str,
     pub len: usize,
     pub line: usize,
+    pub col: usize,
 }
 
 impl<'src> Token<'src> {
-    fn new(kind: TokenKind<'src>, lexeme: &'src str, len: usize, line: usize) -> Self {
+    fn new(kind: TokenKind<'src>, lexeme: &'src str, len: usize, line: usize, col: usize) -> Self {
         Self {
             kind,
             lexeme,
             len,
             line,
+            col,
         }
     }
 
-    fn eof(line: usize) -> Self {
+    fn eof(line: usize, col: usize) -> Self {
         Self {
             kind: TokenKind::Eof,
             lexeme: "",
             len: 0,
             line,
+            col,
         }
     }
 
@@ -157,8 +160,10 @@ impl<'src> Token<'src> {
 struct Cursor<'a> {
     /// Iterator over src chars
     chars: Peekable<Chars<'a>>,
-    /// Current line
+    /// Current line, starts from 1
     line: usize,
+    /// Current column, starts from 1
+    col: usize,
     byte_pos: usize,
 }
 
@@ -169,6 +174,7 @@ impl<'a> Cursor<'a> {
         Self {
             chars: chars.peekable(),
             line: 1,
+            col: 1,
             byte_pos: 0,
         }
     }
@@ -178,8 +184,10 @@ impl<'a> Cursor<'a> {
         let ch = self.chars.next()?;
         if ch == '\n' {
             self.line += 1;
+            self.col = 0;
         }
         self.byte_pos += ch.len_utf8();
+        self.col += 1;
         Some(ch)
     }
 
@@ -220,9 +228,10 @@ impl<'src> Lexer<'src> {
             self.cursor.bump();
         }
 
+        let col = self.cursor.col;
         let start = self.cursor.byte_pos;
         let Some(ch) = self.cursor.bump() else {
-            return Token::eof(self.cursor.line);
+            return Token::eof(self.cursor.line, self.cursor.col);
         };
 
         let token_kind = match ch {
@@ -321,7 +330,13 @@ impl<'src> Lexer<'src> {
         };
 
         let lexeme = &self.src[start..self.cursor.byte_pos];
-        Token::new(token_kind, lexeme, lexeme.chars().count(), self.cursor.line)
+        Token::new(
+            token_kind,
+            lexeme,
+            lexeme.chars().count(),
+            self.cursor.line,
+            col,
+        )
     }
 
     /// Peek into the next token. Peeked token is cached under the hood and will be returned in
@@ -596,36 +611,34 @@ mod tests {
     fn string() {
         let mut lexer = Lexer::new(r#""this is a test string""#);
         let tokens = lexer.tokenize();
-        assert_eq!(
-            tokens,
-            vec![Token {
+        assert!(matches!(
+            tokens.as_slice(),
+            [Token {
                 kind: TokenKind::Literal(Literal::String {
                     s: "this is a test string",
                     terminated: true
                 }),
                 lexeme: "\"this is a test string\"",
-                len: 23,
-                line: 1,
+                ..
             }]
-        )
+        ))
     }
 
     #[test]
     fn unterminaed_string() {
         let mut lexer = Lexer::new(r#""this is an unterminated string"#);
         let tokens = lexer.tokenize();
-        assert_eq!(
-            tokens,
-            vec![Token {
+        assert!(matches!(
+            tokens.as_slice(),
+            [Token {
                 kind: TokenKind::Literal(Literal::String {
                     s: "",
                     terminated: false
                 }),
                 lexeme: "\"this is an unterminated string",
-                len: 31,
-                line: 1,
+                ..
             }]
-        )
+        ))
     }
 
     mod numbers {
@@ -635,45 +648,42 @@ mod tests {
         fn integer() {
             let mut lexer = Lexer::new("1234");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Literal(Literal::Number(1234.0)),
                     lexeme: "1234",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn integer_starts_with_9() {
             let mut lexer = Lexer::new("9123");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Literal(Literal::Number(9123.0)),
                     lexeme: "9123",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn float() {
             let mut lexer = Lexer::new("1234.32");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Literal(Literal::Number(1234.32)),
                     lexeme: "1234.32",
-                    len: 7,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
     }
 
@@ -684,30 +694,28 @@ mod tests {
         fn simple() {
             let mut lexer = Lexer::new("foo");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Ident,
                     lexeme: "foo",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn leading_underscore() {
             let mut lexer = Lexer::new("_foo");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Ident,
                     lexeme: "_foo",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
     }
 
@@ -718,229 +726,213 @@ mod tests {
         fn var() {
             let mut lexer = Lexer::new("var");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Var),
                     lexeme: "var",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn fun() {
             let mut lexer = Lexer::new("fun");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Fun),
                     lexeme: "fun",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_return() {
             let mut lexer = Lexer::new("return");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Return),
                     lexeme: "return",
-                    len: 6,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn class() {
             let mut lexer = Lexer::new("class");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Class),
                     lexeme: "class",
-                    len: 5,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn this() {
             let mut lexer = Lexer::new("this");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::This),
                     lexeme: "this",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_super() {
             let mut lexer = Lexer::new("super");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Super),
                     lexeme: "super",
-                    len: 5,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn nil() {
             let mut lexer = Lexer::new("nil");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Nil),
                     lexeme: "nil",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_if() {
             let mut lexer = Lexer::new("if");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::If),
                     lexeme: "if",
-                    len: 2,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_else() {
             let mut lexer = Lexer::new("else");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Else),
                     lexeme: "else",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn and() {
             let mut lexer = Lexer::new("and");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::And),
                     lexeme: "and",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn or() {
             let mut lexer = Lexer::new("or");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Or),
                     lexeme: "or",
-                    len: 2,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_true() {
             let mut lexer = Lexer::new("true");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::True),
                     lexeme: "true",
-                    len: 4,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
         #[test]
         fn k_false() {
             let mut lexer = Lexer::new("false");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::False),
                     lexeme: "false",
-                    len: 5,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn k_for() {
             let mut lexer = Lexer::new("for");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::For),
                     lexeme: "for",
-                    len: 3,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn k_while() {
             let mut lexer = Lexer::new("while");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::While),
                     lexeme: "while",
-                    len: 5,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
 
         #[test]
         fn print() {
             let mut lexer = Lexer::new("print");
             let tokens = lexer.tokenize();
-            assert_eq!(
-                tokens,
-                vec![Token {
+            assert!(matches!(
+                tokens.as_slice(),
+                [Token {
                     kind: TokenKind::Keyword(Keyword::Print),
                     lexeme: "print",
-                    len: 5,
-                    line: 1,
+                    ..
                 }]
-            )
+            ))
         }
     }
 }

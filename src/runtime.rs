@@ -71,12 +71,12 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Atom::String(s) => Ok(Value::String(Cow::Borrowed(s))),
                 Atom::Bool(b) => Ok(Value::Bool(*b)),
                 Atom::Nil => Ok(Value::Nil),
-                Atom::Ident(ident) => Ok(self
+                Atom::Ident{name, ..} => Ok(self
                     .env
                     .borrow()
-                    .get(ident)
+                    .get(name)
                     .map(|v| v.to_owned())
-                    .ok_or(RuntimeError::UndeclaredVar(ident.to_string()))?),
+                    .ok_or(RuntimeError::UndeclaredVar(name.to_string()))?),
             },
             Expr::Cons(op, args) => match op {
                 Op::Add => match args.as_slice() {
@@ -219,8 +219,8 @@ impl<'src, W: Write> Runtime<'src, W> {
                 },
                 Op::Assign => match args.as_slice() {
                     [ident, right] => match (ident, self.eval_expr(right)?) {
-                        (Expr::Atom(Atom::Ident(ident)), val) => {
-                            self.env.borrow_mut().update(ident, val.clone())?; Ok(val)
+                        (Expr::Atom(Atom::Ident{name, ..}), val) => {
+                            self.env.borrow_mut().update(name, val.clone())?; Ok(val)
                         }
                         _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                     },

@@ -21,15 +21,15 @@ impl<'src> Resolver<'src> {
     fn resolve_expr(&self, expr: &Expr<'src>) -> Result<(), ResolveError> {
         match expr {
             Expr::Atom(atom) => match atom {
-                Atom::Ident(ident) => {
+                Atom::Ident { name, .. } => {
                     // Undefined vars in an expression can only occur when
                     // evaluating an expression of a declared variable.
-                    if let Some(defined) = self.cur_scope().get(ident)
+                    if let Some(defined) = self.cur_scope().get(name)
                         && !defined
                     {
                         return Err(ResolveError::VarReadInItsInitializer);
                     }
-                    self.resolve_local(ident)?;
+                    self.resolve_local(name)?;
                     Ok(())
                 }
                 _ => Ok(()),

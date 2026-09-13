@@ -57,6 +57,78 @@ pub enum Stmt<'src> {
     },
 }
 
+impl<'src> std::fmt::Display for Stmt<'src> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Expr(expr) => write!(f, "{expr}"),
+            Self::Print(expr) => write!(f, "(print {expr})"),
+            Self::Var { name, init_val } => write!(f, "(var {name} {init_val})"),
+            Self::Block(stmts) => {
+                write!(f, "(block")?;
+                for stmt in stmts {
+                    write!(f, " {stmt}")?;
+                }
+                write!(f, ")")
+            }
+            Self::If {
+                condition,
+                stmt,
+                else_stmt,
+            } => match else_stmt {
+                Some(else_stmt) => write!(f, "(if {condition} {stmt} {else_stmt})"),
+                None => write!(f, "(if {condition} {stmt})"),
+            },
+            Self::While { condition, body } => write!(f, "(while {condition} {body})"),
+            Self::For {
+                initializer,
+                condition,
+                increment,
+                body,
+            } => {
+                write!(f, "(for")?;
+
+                if let Some(initializer) = initializer {
+                    write!(f, " {initializer}")?;
+                } else {
+                    write!(f, " ()")?;
+                }
+
+                write!(f, " {condition}")?;
+
+                if let Some(increment) = increment {
+                    write!(f, " {increment}")?;
+                } else {
+                    write!(f, " ()")?;
+                }
+
+                write!(f, " {body})")
+            }
+            Self::FunDecl {
+                ident,
+                parameters,
+                body,
+            } => {
+                write!(f, "(fun {ident}")?;
+                for param in parameters {
+                    write!(f, " {param}")?;
+                }
+                write!(f, " (block")?;
+                for stmt in body {
+                    write!(f, " {stmt}")?;
+                }
+                write!(f, "))")
+            }
+            Self::Return(expr) => {
+                if let Some(expr) = expr {
+                    write!(f, "(return {expr})")
+                } else {
+                    write!(f, "(return)")
+                }
+            }
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum Expr<'src> {
     Atom(Atom<'src>),
@@ -79,12 +151,18 @@ impl<'src> std::fmt::Display for Expr<'src> {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+pub struct Loc {
+    line: usize,
+    col: usize,
+}
+
+#[derive(Debug, Clone, PartialEq)]
 pub enum Atom<'src> {
     Number(f64),
     String(&'src str),
     Bool(bool),
     Nil,
-    Ident(&'src str),
+    Ident { name: &'src str, loc: Loc },
 }
 
 impl<'src> std::fmt::Display for Atom<'src> {
@@ -97,10 +175,10 @@ impl<'src> std::fmt::Display for Atom<'src> {
                     write!(f, "{}", n)
                 }
             }
-            Self::String(s) => write!(f, "{}", s),
+            Self::String(s) => write!(f, "\"{}\"", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
-            Self::Ident(ident) => write!(f, "{}", ident),
+            Self::Ident { name, .. } => write!(f, "{}", name),
         }
     }
 }
@@ -121,7 +199,13 @@ impl<'src> TryFrom<&Token<'src>> for Atom<'src> {
             TokenKind::Keyword(Keyword::True) => Ok(Atom::Bool(true)),
             TokenKind::Keyword(Keyword::False) => Ok(Atom::Bool(false)),
             TokenKind::Keyword(Keyword::Nil) => Ok(Atom::Nil),
-            TokenKind::Ident => Ok(Atom::Ident(value.lexeme)),
+            TokenKind::Ident => Ok(Atom::Ident {
+                name: value.lexeme,
+                loc: Loc {
+                    line: value.line,
+                    col: value.col,
+                },
+            }),
             _ => Err(()),
         }
     }
@@ -677,7 +761,7 @@ mod tests {
     fn string() {
         let mut parser = Parser::new("\"hello\"");
         let expr = parser.next_expr().unwrap();
-        assert_eq!(format!("{expr}"), "hello");
+        assert_eq!(format!("{expr}"), "\"hello\"");
     }
 
     #[test]
@@ -998,20 +1082,11 @@ mod tests {
                 }
             ";
             let mut parser = Parser::new(src);
-            let res = parser.next_stmt().unwrap();
+            let stmt = parser.next_stmt().unwrap().unwrap();
+
             assert_eq!(
-                res,
-                Some(Stmt::If {
-                    condition: Expr::Atom(Atom::Bool(true)),
-                    stmt: Box::new(Stmt::Block(vec![
-                        Stmt::Var {
-                            name: "a",
-                            init_val: Expr::Atom(Atom::Number(10.0))
-                        },
-                        Stmt::Print(Expr::Atom(Atom::Ident("a"))),
-                    ])),
-                    else_stmt: None,
-                })
+                format!("{stmt}"),
+                "(if true (block (var a 10.0) (print a)))"
             )
         }
 
@@ -1023,16 +1098,10 @@ mod tests {
                 } else print \"bad\";
             ";
             let mut parser = Parser::new(src);
-            let res = parser.next_stmt().unwrap();
+            let stmt = parser.next_stmt().unwrap().unwrap();
             assert_eq!(
-                res,
-                Some(Stmt::If {
-                    condition: Expr::Atom(Atom::Bool(false)),
-                    stmt: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::String(
-                        "good"
-                    ))),])),
-                    else_stmt: Some(Box::new(Stmt::Print(Expr::Atom(Atom::String("bad")))))
-                })
+                format!("{stmt}"),
+                "(if false (block (print \"good\")) (print \"bad\"))"
             )
         }
 
@@ -1048,26 +1117,10 @@ mod tests {
                 }
             ";
             let mut parser = Parser::new(src);
-            let res = parser.next_stmt().unwrap();
+            let stmt = parser.next_stmt().unwrap().unwrap();
             assert_eq!(
-                res,
-                Some(Stmt::If {
-                    condition: Expr::Atom(Atom::Bool(true)),
-                    stmt: Box::new(Stmt::Block(vec![
-                        Stmt::Var {
-                            name: "a",
-                            init_val: Expr::Atom(Atom::Number(10.0))
-                        },
-                        Stmt::Print(Expr::Atom(Atom::Ident("a"))),
-                    ])),
-                    else_stmt: Some(Box::new(Stmt::Block(vec![
-                        Stmt::Var {
-                            name: "b",
-                            init_val: Expr::Atom(Atom::Number(20.0))
-                        },
-                        Stmt::Print(Expr::Atom(Atom::Ident("b"))),
-                    ]))),
-                })
+                format!("{stmt}"),
+                "(if true (block (var a 10.0) (print a)) (block (var b 20.0) (print b)))"
             )
         }
 
@@ -1079,16 +1132,8 @@ mod tests {
                 }
             ";
             let mut parser = Parser::new(src);
-            let res = parser.next_stmt().unwrap();
-            assert_eq!(
-                res,
-                Some(Stmt::While {
-                    condition: Expr::Atom(Atom::Bool(true)),
-                    body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Number(
-                        10.0
-                    )))])),
-                })
-            )
+            let stmt = parser.next_stmt().unwrap().unwrap();
+            assert_eq!(format!("{stmt}"), "(while true (block (print 10.0)))")
         }
 
         mod for_stmt {
@@ -1100,33 +1145,10 @@ mod tests {
                 for (var i = 0; i < 10; i = i + 1) print i;
             ";
                 let mut parser = Parser::new(src);
-                let res = parser.next_stmt().unwrap();
+                let stmt = parser.next_stmt().unwrap().unwrap();
                 assert_eq!(
-                    res,
-                    Some(Stmt::For {
-                        initializer: Some(Box::new(Stmt::Var {
-                            name: "i",
-                            init_val: Expr::Atom(Atom::Number(0.0)),
-                        })),
-                        condition: Expr::Cons(
-                            Op::Less,
-                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(10.0))]
-                        ),
-                        increment: Some(Expr::Cons(
-                            Op::Assign,
-                            vec![
-                                Expr::Atom(Atom::Ident("i")),
-                                Expr::Cons(
-                                    Op::Add,
-                                    vec![
-                                        Expr::Atom(Atom::Ident("i")),
-                                        Expr::Atom(Atom::Number(1.0))
-                                    ]
-                                )
-                            ]
-                        )),
-                        body: Box::new(Stmt::Print(Expr::Atom(Atom::Ident("i")))),
-                    })
+                    format!("{stmt}"),
+                    "(for (var i 0.0) (< i 10.0) (= i (+ i 1.0)) (print i))"
                 )
             }
 
@@ -1138,35 +1160,10 @@ mod tests {
                 }
             ";
                 let mut parser = Parser::new(src);
-                let res = parser.next_stmt().unwrap();
+                let stmt = parser.next_stmt().unwrap().unwrap();
                 assert_eq!(
-                    res,
-                    Some(Stmt::For {
-                        initializer: Some(Box::new(Stmt::Var {
-                            name: "i",
-                            init_val: Expr::Atom(Atom::Number(0.0)),
-                        })),
-                        condition: Expr::Cons(
-                            Op::Less,
-                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(10.0))]
-                        ),
-                        increment: Some(Expr::Cons(
-                            Op::Assign,
-                            vec![
-                                Expr::Atom(Atom::Ident("i")),
-                                Expr::Cons(
-                                    Op::Add,
-                                    vec![
-                                        Expr::Atom(Atom::Ident("i")),
-                                        Expr::Atom(Atom::Number(1.0))
-                                    ]
-                                )
-                            ]
-                        )),
-                        body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Ident(
-                            "i"
-                        )))])),
-                    })
+                    format!("{stmt}"),
+                    "(for (var i 0.0) (< i 10.0) (= i (+ i 1.0)) (block (print i)))"
                 )
             }
 
@@ -1179,36 +1176,10 @@ mod tests {
                     }
                 ";
                 let mut parser = Parser::new(src);
-                let res = parser.next_stmt().unwrap();
+                let stmt = parser.next_stmt().unwrap().unwrap();
                 assert_eq!(
-                    res,
-                    Some(Stmt::For {
-                        initializer: Some(Box::new(Stmt::Var {
-                            name: "i",
-                            init_val: Expr::Atom(Atom::Number(0.0)),
-                        })),
-                        condition: Expr::Cons(
-                            Op::Less,
-                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(3.0))]
-                        ),
-                        increment: None,
-                        body: Box::new(Stmt::Block(vec![
-                            Stmt::Print(Expr::Atom(Atom::Ident("i"))),
-                            Stmt::Expr(Expr::Cons(
-                                Op::Assign,
-                                vec![
-                                    Expr::Atom(Atom::Ident("i")),
-                                    Expr::Cons(
-                                        Op::Add,
-                                        vec![
-                                            Expr::Atom(Atom::Ident("i")),
-                                            Expr::Atom(Atom::Number(1.0))
-                                        ]
-                                    )
-                                ]
-                            ))
-                        ])),
-                    })
+                    format!("{stmt}"),
+                    "(for (var i 0.0) (< i 3.0) () (block (print i) (= i (+ i 1.0))))"
                 )
             }
 
@@ -1220,21 +1191,8 @@ mod tests {
                     }
                 ";
                 let mut parser = Parser::new(src);
-                let res = parser.next_stmt().unwrap();
-                assert_eq!(
-                    res,
-                    Some(Stmt::For {
-                        initializer: None,
-                        condition: Expr::Cons(
-                            Op::Less,
-                            vec![Expr::Atom(Atom::Ident("i")), Expr::Atom(Atom::Number(3.0))]
-                        ),
-                        increment: None,
-                        body: Box::new(Stmt::Block(vec![Stmt::Print(Expr::Atom(Atom::Ident(
-                            "i"
-                        ))),])),
-                    })
-                )
+                let stmt = parser.next_stmt().unwrap().unwrap();
+                assert_eq!(format!("{stmt}"), "(for () (< i 3.0) () (block (print i)))")
             }
         }
 
@@ -1245,47 +1203,24 @@ mod tests {
             fn simple_call() {
                 let src = "fn_name()";
                 let mut parser = Parser::new(src);
-                let res = parser.next_expr().unwrap();
-                assert_eq!(
-                    res,
-                    Expr::Cons(Op::Call, vec![Expr::Atom(Atom::Ident("fn_name"))])
-                )
+                let expr = parser.next_expr().unwrap();
+                assert_eq!(format!("{expr}"), "(call fn_name)")
             }
 
             #[test]
             fn call_with_argument() {
                 let src = "fn_name(10)";
                 let mut parser = Parser::new(src);
-                let res = parser.next_expr().unwrap();
-                assert_eq!(
-                    res,
-                    Expr::Cons(
-                        Op::Call,
-                        vec![
-                            Expr::Atom(Atom::Ident("fn_name"),),
-                            Expr::Atom(Atom::Number(10.0))
-                        ]
-                    )
-                )
+                let expr = parser.next_expr().unwrap();
+                assert_eq!(format!("{expr}"), "(call fn_name 10.0)")
             }
 
             #[test]
             fn call_with_multiple_arguments() {
                 let src = "fn_name(10, \"a\", true)";
                 let mut parser = Parser::new(src);
-                let res = parser.next_expr().unwrap();
-                assert_eq!(
-                    res,
-                    Expr::Cons(
-                        Op::Call,
-                        vec![
-                            Expr::Atom(Atom::Ident("fn_name")),
-                            Expr::Atom(Atom::Number(10.0)),
-                            Expr::Atom(Atom::String("a")),
-                            Expr::Atom(Atom::Bool(true)),
-                        ]
-                    )
-                )
+                let expr = parser.next_expr().unwrap();
+                assert_eq!(format!("{expr}"), "(call fn_name 10.0 \"a\" true)")
             }
         }
     }
@@ -1298,15 +1233,8 @@ mod tests {
             }
         ";
         let mut parser = Parser::new(src);
-        let res = parser.next_stmt().unwrap();
-        assert_eq!(
-            res,
-            Some(Stmt::FunDecl {
-                ident: "my_func",
-                parameters: vec![],
-                body: vec![Stmt::Print(Expr::Atom(Atom::Number(10.0)))],
-            })
-        )
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(fun my_func (block (print 10.0)))")
     }
 
     #[test]
@@ -1317,15 +1245,8 @@ mod tests {
             }
         ";
         let mut parser = Parser::new(src);
-        let res = parser.next_stmt().unwrap();
-        assert_eq!(
-            res,
-            Some(Stmt::FunDecl {
-                ident: "my_func",
-                parameters: vec!["a", "b", "c"],
-                body: vec![Stmt::Print(Expr::Atom(Atom::Ident("a")))],
-            })
-        )
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(fun my_func a b c (block (print a)))")
     }
 
     #[test]
@@ -1336,14 +1257,21 @@ mod tests {
             }
         ";
         let mut parser = Parser::new(src);
-        let res = parser.next_stmt().unwrap();
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(fun my_func (block (return 10.0)))")
+    }
+
+    #[test]
+    fn identifier_contains_location() {
+        let src = "print a;";
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
         assert_eq!(
-            res,
-            Some(Stmt::FunDecl {
-                ident: "my_func",
-                parameters: vec![],
-                body: vec![Stmt::Return(Some(Expr::Atom(Atom::Number(10.0))))],
-            })
+            stmt,
+            Stmt::Print(Expr::Atom(Atom::Ident {
+                name: "a",
+                loc: Loc { line: 1, col: 7 }
+            }))
         )
     }
 }
