@@ -218,8 +218,8 @@ x is less than y:
 
 #[test]
 fn uses_proper_binded_var_for_the_captured_scope() {
-    let src = "
-        var variable = \"global\";
+    let src = r#"
+        var variable = "global";
 
         {
           fun f() {
@@ -227,10 +227,10 @@ fn uses_proper_binded_var_for_the_captured_scope() {
           }
 
           f();
-          var variable = \"local\";
+          var variable = "local";
           f();
         }
-    ";
+    "#;
     let mut file = tempfile::NamedTempFile::new().unwrap();
     writeln!(file, "{}", src).unwrap();
 

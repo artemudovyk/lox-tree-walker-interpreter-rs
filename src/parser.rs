@@ -390,6 +390,9 @@ impl<'src> Parser<'src> {
                         line: self.current_line(),
                     });
                 }
+                TokenKind::Comment => {
+                    self.lexer.advance();
+                }
                 _ => statements.push(
                     self.next_stmt()?
                         .expect("Statement is expected at this point"),
@@ -1284,5 +1287,15 @@ mod tests {
                 loc: Loc { line: 1, col: 7 }
             }))
         )
+    }
+
+    #[test]
+    fn inline_comment_inside_of_block() {
+        let src = r#"{
+    f(); // test comment
+}"#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(block (call f))");
     }
 }
