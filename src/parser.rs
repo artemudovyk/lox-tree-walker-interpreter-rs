@@ -186,7 +186,8 @@ impl<'src> std::fmt::Display for Atom<'src> {
                     write!(f, "{}", n)
                 }
             }
-            Self::String(s) => write!(f, "\"{}\"", s),
+            // Self::String(s) => write!(f, "\"{}\"", s),
+            Self::String(s) => write!(f, "{}", s),
             Self::Bool(b) => write!(f, "{}", b),
             Self::Nil => write!(f, "nil"),
             Self::Ident { name, .. } => write!(f, "{}", name),
@@ -775,7 +776,8 @@ mod tests {
     fn string() {
         let mut parser = Parser::new("\"hello\"");
         let expr = parser.next_expr().unwrap();
-        assert_eq!(format!("{expr}"), "\"hello\"");
+        // assert_eq!(format!("{expr}"), "\"hello\"");
+        assert_eq!(format!("{expr}"), "hello");
     }
 
     #[test]
@@ -1113,9 +1115,13 @@ mod tests {
             ";
             let mut parser = Parser::new(src);
             let stmt = parser.next_stmt().unwrap().unwrap();
+            // assert_eq!(
+            //     format!("{stmt}"),
+            //     "(if false (block (print \"good\")) (print \"bad\"))"
+            // )
             assert_eq!(
                 format!("{stmt}"),
-                "(if false (block (print \"good\")) (print \"bad\"))"
+                "(if false (block (print good)) (print bad))"
             )
         }
 
@@ -1234,7 +1240,8 @@ mod tests {
                 let src = "fn_name(10, \"a\", true)";
                 let mut parser = Parser::new(src);
                 let expr = parser.next_expr().unwrap();
-                assert_eq!(format!("{expr}"), "(call fn_name 10.0 \"a\" true)")
+                // assert_eq!(format!("{expr}"), "(call fn_name 10.0 \"a\" true)")
+                assert_eq!(format!("{expr}"), "(call fn_name 10.0 a true)")
             }
         }
     }
