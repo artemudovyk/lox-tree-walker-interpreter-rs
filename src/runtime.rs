@@ -1,5 +1,6 @@
 use crate::environment::Env;
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
+use crate::resolver::{ResolveError, Resolver};
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -14,6 +15,8 @@ pub enum RuntimeError {
     TypeMismatch(String),
     #[error(transparent)]
     ParseError(#[from] ParseError),
+    #[error(transparent)]
+    ResolveError(#[from] ResolveError),
     #[error("variable {0} is undeclared")]
     UndeclaredVar(String),
     #[error("Can only call functions and classes.")]
@@ -31,6 +34,7 @@ pub enum RuntimeError {
 pub struct Runtime<'src, W: Write> {
     out: W,
     env: Rc<RefCell<Env<'src>>>,
+    resolver: Resolver<'src>,
 }
 
 impl<'src> Runtime<'src, std::io::Stdout> {
@@ -41,6 +45,7 @@ impl<'src> Runtime<'src, std::io::Stdout> {
         Self {
             out: std::io::stdout(),
             env: Rc::new(RefCell::new(env)),
+            resolver: Resolver::new(),
         }
     }
 }
@@ -53,11 +58,13 @@ impl<'src, W: Write> Runtime<'src, W> {
         Self {
             out: writer,
             env: Rc::new(RefCell::new(env)),
+            resolver: Resolver::new(),
         }
     }
 
     pub fn run(&mut self, src: &'src str) -> Result<(), RuntimeError> {
         let mut parser = Parser::new(src);
+        self.resolver.run(src)?;
         while let Some(stmt) = parser.next_stmt()? {
             self.exec_stmt(stmt)?;
         }
@@ -71,12 +78,14 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Atom::String(s) => Ok(Value::String(Cow::Borrowed(s))),
                 Atom::Bool(b) => Ok(Value::Bool(*b)),
                 Atom::Nil => Ok(Value::Nil),
-                Atom::Ident{name, ..} => Ok(self
-                    .env
-                    .borrow()
-                    .get(name)
-                    .map(|v| v.to_owned())
-                    .ok_or(RuntimeError::UndeclaredVar(name.to_string()))?),
+                // Atom::Ident{name, ..} => Ok(self
+                //     .env
+                //     .borrow()
+                //     .get(name)
+                //     .map(|v| v.to_owned())
+                //     .ok_or(RuntimeError::UndeclaredVar(name.to_string()))?),
+                Atom::Ident { name, .. } => Ok(self.look_up_ident(atom)
+                     .ok_or(RuntimeError::UndeclaredVar(name.to_string()))?),
             },
             Expr::Cons(op, args) => match op {
                 Op::Add => match args.as_slice() {
@@ -403,6 +412,17 @@ impl<'src, W: Write> Runtime<'src, W> {
                 None => Ok(Some(Value::Nil)),
             },
         }
+    }
+
+    fn look_up_ident(&self, atom: &Atom) -> Option<Value<'src>> {
+        if let Atom::Ident { name, .. } = atom {
+            dbg!(&name);
+            let distance = self.resolver.locals.get(&atom.ident_hash())?;
+            dbg!(&distance);
+            let val = self.env.borrow().get_at(name, *distance);
+            return val;
+        }
+        panic!("Can't look up atom of type other than Ident");
     }
 }
 

@@ -1,10 +1,15 @@
-use crate::runtime::{RuntimeError, Value};
+use crate::{
+    resolver::ResolveError,
+    runtime::{RuntimeError, Value},
+};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
+
+type Enclosure<'src> = Rc<RefCell<Env<'src>>>;
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Env<'src> {
     map: HashMap<&'src str, Value<'src>>,
-    outer: Option<Rc<RefCell<Env<'src>>>>,
+    outer: Option<Enclosure<'src>>,
 }
 
 impl<'src> Env<'src> {
@@ -43,6 +48,22 @@ impl<'src> Env<'src> {
         })
     }
 
+    pub fn get_at(&self, key: &str, distance: usize) -> Option<Value<'src>> {
+        if distance == 0 {
+            return self.map.get(key).cloned();
+        }
+
+        let mut current = self.outer.clone();
+        for _ in 1..distance {
+            if let Some(c) = current {
+                current = c.borrow().outer.clone()
+            } else {
+                return None;
+            }
+        }
+        current.and_then(|v| v.borrow().get(key))
+    }
+
     pub fn set(&mut self, key: &'src str, val: Value<'src>) {
         self.map.insert(key, val);
     }
@@ -55,6 +76,35 @@ impl<'src> Env<'src> {
             }
         } else {
             self.set(key, val);
+        }
+
+        Ok(())
+    }
+
+    pub fn update_at(
+        &mut self,
+        key: &'src str,
+        val: Value<'src>,
+        distance: usize,
+    ) -> Result<(), RuntimeError> {
+        if distance == 0 {
+            self.set(key, val);
+            return Ok(());
+        }
+
+        let mut current = self.outer.clone();
+        for _ in 1..distance {
+            if let Some(c) = current {
+                current = c.borrow().outer.clone()
+            } else {
+                panic!("No env at this distance")
+            }
+        }
+
+        if let Some(current) = current {
+            current.borrow_mut().set(key, val);
+        } else {
+            panic!("No env at this distance")
         }
 
         Ok(())

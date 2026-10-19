@@ -1,24 +1,34 @@
+use crate::parser::{Atom, Expr, ParseError, Stmt};
+use crate::parser::{Loc, Parser};
 use std::collections::HashMap;
-
-use crate::parser::{Atom, Expr, Op, ParseError, Stmt};
 
 type Scope<'src> = HashMap<&'src str, bool>;
 
 pub struct Resolver<'src> {
     scopes: Vec<Scope<'src>>,
+    pub locals: HashMap<String, usize>,
 }
 
 impl<'src> Resolver<'src> {
-    fn new() -> Self {
+    pub fn new() -> Self {
+        let mut global_scope = Scope::new();
+        global_scope.insert("clock", true);
+
         Self {
-            scopes: vec![
-                // Default global scope
-                Scope::new(),
-            ],
+            scopes: vec![global_scope],
+            locals: HashMap::new(),
         }
     }
 
-    fn resolve_expr(&self, expr: &Expr<'src>) -> Result<(), ResolveError> {
+    pub fn run(&mut self, src: &'src str) -> Result<(), ResolveError> {
+        let mut parser = Parser::new(src);
+        while let Some(stmt) = parser.next_stmt()? {
+            self.resolve_stmt(&stmt)?;
+        }
+        Ok(())
+    }
+
+    fn resolve_expr(&mut self, expr: &Expr<'src>) -> Result<(), ResolveError> {
         match expr {
             Expr::Atom(atom) => match atom {
                 Atom::Ident { name, .. } => {
@@ -29,7 +39,7 @@ impl<'src> Resolver<'src> {
                     {
                         return Err(ResolveError::VarReadInItsInitializer);
                     }
-                    self.resolve_local(name)?;
+                    self.resolve_local(name, atom.ident_hash())?;
                     Ok(())
                 }
                 _ => Ok(()),
@@ -154,17 +164,24 @@ impl<'src> Resolver<'src> {
             .expect("At least one scope should be present")
     }
 
-    fn resolve_local(&self, ident: &'src str) -> Result<u16, ResolveError> {
+    fn resolve_local(&mut self, ident: &'src str, hash: String) -> Result<(), ResolveError> {
         for (distance, scope) in self.scopes.iter().rev().enumerate() {
             if scope.get(ident).is_some() {
-                return Ok(distance as u16);
+                self.locals.insert(hash, distance);
+                return Ok(());
             }
         }
         Err(ResolveError::UndeclaredVar(ident.to_owned()))
     }
 }
 
-#[derive(Debug, thiserror::Error)]
+impl<'src> Default for Resolver<'src> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[derive(Debug, PartialEq, thiserror::Error)]
 pub enum ResolveError {
     #[error(transparent)]
     ParseError(#[from] ParseError),

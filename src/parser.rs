@@ -1,4 +1,6 @@
 #![allow(dead_code)]
+use std::hash::Hash;
+
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -152,8 +154,8 @@ impl<'src> std::fmt::Display for Expr<'src> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Loc {
-    line: usize,
-    col: usize,
+    pub line: usize,
+    pub col: usize,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -163,6 +165,15 @@ pub enum Atom<'src> {
     Bool(bool),
     Nil,
     Ident { name: &'src str, loc: Loc },
+}
+
+impl<'src> Atom<'src> {
+    pub fn ident_hash(&self) -> String {
+        match self {
+            Self::Ident { name, loc } => format!("{}#{}#{}", name, loc.line, loc.col),
+            _ => panic!("Hash not supported for this atom type"),
+        }
+    }
 }
 
 impl<'src> std::fmt::Display for Atom<'src> {
