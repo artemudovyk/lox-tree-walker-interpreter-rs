@@ -10,38 +10,31 @@
   outputs =
     inputs:
     let
-      systems = [
-        "x86_64-linux"
-      ];
-
-      # Allows to re-configure default nixpkgs
+      # Uses Nixpkgs' internal exposed system list instead of hardcoded strings
       eachSystem =
-        systems: f:
-        builtins.foldl' (
-          a: s: a // builtins.mapAttrs (k: v: (a.${k} or { }) // { ${s} = v; }) (f s)
-        ) { } systems;
+        f:
+        inputs.nixpkgs.lib.genAttrs inputs.nixpkgs.lib.systems.flakeExposed (
+          system:
+          f (
+            import inputs.nixpkgs {
+              inherit system;
+              overlays = [ (import inputs.rust-overlay) ];
+              config.allowUnfree = true;
+            }
+          )
+        );
     in
-    eachSystem systems (
-      system:
-      let
-        overlays = [ (import inputs.rust-overlay) ];
-        pkgs = import inputs.nixpkgs {
-          inherit system overlays;
-          config.allowUnfree = true;
-        };
-      in
-      {
-        devShells.default = pkgs.mkShell {
+    {
+      devShells = eachSystem (pkgs: {
+        default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             rust-bin.stable.latest.default
             pkg-config
             cargo-nextest
           ];
-
           depsBuildBuild = [ ];
-
           buildInputs = [ ];
         };
-      }
-    );
+      });
+    };
 }
