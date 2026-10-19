@@ -373,3 +373,24 @@ print clock(;
         .failure()
         .code(65);
 }
+
+#[test]
+fn using_previosly_declared_variable_valie_to_initialize_a_new_variable_should_work() {
+    let src = r#"
+var quz = "after";
+var quz = "before";
+// Using a previously declared variable's value to
+// initialize a new variable should work
+var quz = quz;
+print quz;
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("before"));
+}

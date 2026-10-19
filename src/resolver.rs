@@ -143,7 +143,8 @@ impl<'src> Resolver<'src> {
         self.scopes
             .last_mut()
             .expect("At least one scope should be present")
-            .insert(name, false);
+            .entry(name)
+            .or_insert(false);
     }
 
     fn define(&mut self, name: &'src str) {
