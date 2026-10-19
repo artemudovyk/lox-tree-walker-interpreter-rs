@@ -282,3 +282,41 @@ var count = 0;
         .success()
         .stdout(predicate::str::contains("1\n2\n3"));
 }
+
+#[test]
+fn function_name_hoisting() {
+    let src = r#"
+// This program uses mutual recursion to determine
+// if a number is even or odd.
+// It also uses a shared threshold variable that
+// is used to determine if a number is too large
+// to be processed.
+{
+  var threshold = 50;
+
+  fun isEven(n) {
+    if (n == 0) return true;
+    if (n > threshold) return false;
+    return isOdd(n - 1);
+  }
+
+  fun isOdd(n) {
+    if (n == 0) return false;
+    if (n > threshold) return false;
+    return isEven(n - 1);
+  }
+
+  print isEven(75);
+}
+
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("false"));
+}

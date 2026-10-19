@@ -68,6 +68,14 @@ impl<'src> Resolver<'src> {
             Stmt::Block(statements) => {
                 self.begin_scope();
                 for stmt in statements {
+                    // Define function names in the block first to make them available for the
+                    // current scope.
+                    if let &Stmt::FunDecl { ident, .. } = stmt {
+                        self.declare(ident);
+                        self.define(ident);
+                    }
+                }
+                for stmt in statements {
                     self.resolve_stmt(stmt)?;
                 }
                 self.end_scope();
