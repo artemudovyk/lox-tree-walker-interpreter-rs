@@ -228,8 +228,11 @@ impl<'src, W: Write> Runtime<'src, W> {
                 },
                 Op::Assign => match args.as_slice() {
                     [ident, right] => match (ident, self.eval_expr(right)?) {
-                        (Expr::Atom(Atom::Ident{name, ..}), val) => {
-                            self.env.borrow_mut().update(name, val.clone())?; Ok(val)
+                        (Expr::Atom(atom @ Atom::Ident {..}), val) => {
+                            // self.env.borrow_mut().update(name, val.clone())?; 
+                            // Ok(val)
+                            self.update_ident(atom, val.clone())?;
+                            Ok(val)
                         }
                         _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                     },
@@ -418,6 +421,15 @@ impl<'src, W: Write> Runtime<'src, W> {
         if let Atom::Ident { name, .. } = atom {
             let distance = self.resolver.locals.get(&atom.ident_hash())?;
             return self.env.borrow().get_at(name, *distance);
+        }
+        panic!("Can't look up atom of type other than Ident");
+    }
+
+    fn update_ident(&self, atom: &Atom<'src>, val: Value<'src>) -> Result<(), RuntimeError> {
+        if let Atom::Ident { name, .. } = atom {
+            let distance = self.resolver.locals.get(&atom.ident_hash()).unwrap();
+            self.env.borrow_mut().update_at(name, val, *distance)?;
+            return Ok(());
         }
         panic!("Can't look up atom of type other than Ident");
     }

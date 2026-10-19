@@ -241,3 +241,44 @@ fn uses_proper_binded_var_for_the_captured_scope() {
         .success()
         .stdout(predicate::str::contains("global\nglobal\n"));
 }
+
+#[test]
+fn mutates_properly_binded_var_for_the_captured_scope() {
+    let src = r#"
+var count = 0;
+
+{
+  // The `counter` function should use the `count`
+  // variable from the
+  // global scope.
+  fun makeCounter() {
+    fun counter() {
+      // This should increment the `count`
+      // variable from the global scope.
+      count = count + 1;
+      print count;
+    }
+    return counter;
+  }
+
+  var counter1 = makeCounter();
+  counter1(); // Should print 1
+  counter1(); // Should print 2
+
+  // This variable declaration shouldn't affect
+  // our counter.
+  var count = 0;
+
+  counter1(); // Should print 3
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("1\n2\n3"));
+}
