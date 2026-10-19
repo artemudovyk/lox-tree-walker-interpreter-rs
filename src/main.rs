@@ -86,6 +86,10 @@ fn main() {
 
             match runtime.run(&file_contents) {
                 Ok(_) => {}
+                Err(RuntimeError::ResolveError(err)) => {
+                    eprintln!("{err}");
+                    std::process::exit(65);
+                }
                 Err(RuntimeError::ParseError(parse_error)) => {
                     eprintln!("{parse_error}");
                     std::process::exit(65);

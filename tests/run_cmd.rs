@@ -354,3 +354,22 @@ fun global() {
         .success()
         .stdout(predicate::str::contains("global\nglobal"));
 }
+
+#[test]
+fn exit_code_65_on_compile_error() {
+    let src = r#"
+// This program is missing the closing parenthesis
+// for the function call
+// Hence the compiler error
+print clock(;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65);
+}
