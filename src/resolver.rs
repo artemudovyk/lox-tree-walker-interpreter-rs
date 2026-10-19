@@ -39,7 +39,7 @@ impl<'src> Resolver<'src> {
                     {
                         return Err(ResolveError::VarReadInItsInitializer);
                     }
-                    self.resolve_local(name, atom.ident_hash())?;
+                    self.resolve_local(name, atom.ident_hash());
                     Ok(())
                 }
                 _ => Ok(()),
@@ -67,14 +67,17 @@ impl<'src> Resolver<'src> {
             }
             Stmt::Block(statements) => {
                 self.begin_scope();
-                for stmt in statements {
-                    // Define function names in the block first to make them available for the
-                    // current scope.
-                    if let &Stmt::FunDecl { ident, .. } = stmt {
-                        self.declare(ident);
-                        self.define(ident);
-                    }
-                }
+                // NOTE: commenting it out because of how it breaks things when global functions are
+                // involved.
+                //
+                // for stmt in statements {
+                //     // Define function names in the block first to make them available for the
+                //     // current scope.
+                //     if let &Stmt::FunDecl { ident, .. } = stmt {
+                //         self.declare(ident);
+                //         self.define(ident);
+                //     }
+                // }
                 for stmt in statements {
                     self.resolve_stmt(stmt)?;
                 }
@@ -166,20 +169,20 @@ impl<'src> Resolver<'src> {
             .expect("At least one scope should be present")
     }
 
+    #[allow(dead_code)]
     fn cur_scope_mut(&mut self) -> &mut Scope<'src> {
         self.scopes
             .last_mut()
             .expect("At least one scope should be present")
     }
 
-    fn resolve_local(&mut self, ident: &'src str, hash: String) -> Result<(), ResolveError> {
+    fn resolve_local(&mut self, ident: &'src str, hash: String) {
         for (distance, scope) in self.scopes.iter().rev().enumerate() {
             if scope.get(ident).is_some() {
                 self.locals.insert(hash, distance);
-                return Ok(());
+                return;
             }
         }
-        Err(ResolveError::UndeclaredVar(ident.to_owned()))
     }
 }
 

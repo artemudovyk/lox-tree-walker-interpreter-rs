@@ -419,8 +419,12 @@ impl<'src, W: Write> Runtime<'src, W> {
 
     fn look_up_ident(&self, atom: &Atom) -> Option<Value<'src>> {
         if let Atom::Ident { name, .. } = atom {
-            let distance = self.resolver.locals.get(&atom.ident_hash())?;
-            return self.env.borrow().get_at(name, *distance);
+            // If there is a local resolved by a resolver with a given distance - use that.
+            // Otherwise we'll look up the entire linked list at runtime bottom to top.
+            return match self.resolver.locals.get(&atom.ident_hash()) {
+                Some(distance) => self.env.borrow().get_at(name, *distance),
+                None => self.env.borrow().get(name),
+            };
         }
         panic!("Can't look up atom of type other than Ident");
     }

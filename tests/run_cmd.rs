@@ -308,7 +308,6 @@ fn function_name_hoisting() {
 
   print isEven(75);
 }
-
     "#;
     let mut file = tempfile::NamedTempFile::new().unwrap();
     writeln!(file, "{}", src).unwrap();
@@ -319,4 +318,39 @@ fn function_name_hoisting() {
         .assert()
         .success()
         .stdout(predicate::str::contains("false"));
+}
+
+#[test]
+fn closure_binding_with_functions() {
+    let src = r#"
+// This function is used in the function `f` below.
+fun global() {
+  print "global";
+}
+
+{
+  fun f() {
+    global();
+  }
+
+  f(); // this should print "global"
+
+  // This function declaration shouldn't affect
+  // the usage in `f` above.
+  fun global() {
+    print "local";
+  }
+
+  f(); // this should also print "global"
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("global\nglobal"));
 }
