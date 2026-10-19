@@ -416,11 +416,8 @@ impl<'src, W: Write> Runtime<'src, W> {
 
     fn look_up_ident(&self, atom: &Atom) -> Option<Value<'src>> {
         if let Atom::Ident { name, .. } = atom {
-            dbg!(&name);
             let distance = self.resolver.locals.get(&atom.ident_hash())?;
-            dbg!(&distance);
-            let val = self.env.borrow().get_at(name, *distance);
-            return val;
+            return self.env.borrow().get_at(name, *distance);
         }
         panic!("Can't look up atom of type other than Ident");
     }
