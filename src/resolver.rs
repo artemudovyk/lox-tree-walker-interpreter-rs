@@ -142,6 +142,9 @@ impl<'src> Resolver<'src> {
                 self.define(ident);
                 self.begin_scope();
                 for param in parameters {
+                    if self.local_in_current_scope(param) {
+                        return Err(ResolveError::RedeclarationInLocalScope(param.to_string()));
+                    }
                     self.declare(param);
                     self.define(param);
                 }

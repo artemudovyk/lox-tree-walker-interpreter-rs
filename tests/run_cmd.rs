@@ -426,3 +426,27 @@ print a;
             "Error at 'a': Already a variable with this name in this scope.",
         ));
 }
+
+#[test]
+fn detects_invalid_func_parameters_redeclarations() {
+    let src = r#"
+// Function parameters must have unique names
+fun foo(arg, arg) { // expect compile error
+    // Function body is irrelevant as the error
+    // occurs in parameter list
+    "body";
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Error at 'arg': Already a variable with this name in this scope.",
+        ));
+}
