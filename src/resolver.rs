@@ -1,6 +1,18 @@
+use crate::parser::Parser;
 use crate::parser::{Atom, Expr, ParseError, Stmt};
-use crate::parser::{Loc, Parser};
 use std::collections::HashMap;
+
+#[derive(Debug, PartialEq, thiserror::Error)]
+pub enum ResolveError {
+    #[error(transparent)]
+    ParseError(#[from] ParseError),
+    #[error("Can't read local variable in its own initializer.")]
+    VarReadInItsInitializer,
+    #[error("Undeclared variable '{0}'")]
+    UndeclaredVar(String),
+    #[error("Error at '{0}': Already a variable with this name in this scope.")]
+    RedeclarationInLocalScope(String),
+}
 
 type Scope<'src> = HashMap<&'src str, bool>;
 
@@ -58,6 +70,9 @@ impl<'src> Resolver<'src> {
             Stmt::Expr(expr) => self.resolve_expr(expr)?,
             Stmt::Print(expr) => self.resolve_expr(expr)?,
             Stmt::Var { name, init_val } => {
+                if self.local_in_current_scope(name) {
+                    return Err(ResolveError::RedeclarationInLocalScope(name.to_string()));
+                }
                 self.declare(name);
                 if !matches!(init_val, Expr::Atom(Atom::Nil)) {
                     self.resolve_expr(init_val)?;
@@ -185,20 +200,19 @@ impl<'src> Resolver<'src> {
             }
         }
     }
+
+    fn local_in_current_scope(&self, ident: &'src str) -> bool {
+        // Global scope is allowed to have multiple redeclarations (lox has a janky approach to
+        // global stuff I do not agree with).
+        if self.scopes.len() == 1 {
+            return false;
+        }
+        self.cur_scope().contains_key(ident)
+    }
 }
 
 impl<'src> Default for Resolver<'src> {
     fn default() -> Self {
         Self::new()
     }
-}
-
-#[derive(Debug, PartialEq, thiserror::Error)]
-pub enum ResolveError {
-    #[error(transparent)]
-    ParseError(#[from] ParseError),
-    #[error("Can't read local variable in its own initializer.")]
-    VarReadInItsInitializer,
-    #[error("Undeclared variable '{0}'")]
-    UndeclaredVar(String),
 }

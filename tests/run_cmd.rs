@@ -394,3 +394,35 @@ print quz;
         .success()
         .stdout(predicate::str::contains("before"));
 }
+
+#[test]
+fn detects_invalid_local_redeclaratios() {
+    let src = r#"
+var a = "1";
+print a;
+
+var a;
+print a;
+
+var a = "2";
+print a;
+
+{
+  var a = "1";
+  var a = "2";
+  print a;
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Error at 'a': Already a variable with this name in this scope.",
+        ));
+}
