@@ -19,6 +19,8 @@ type Scope<'src> = HashMap<&'src str, bool>;
 pub struct Resolver<'src> {
     scopes: Vec<Scope<'src>>,
     pub locals: HashMap<String, usize>,
+    in_loop: bool,
+    parser: Parser<'src>,
 }
 
 impl<'src> Resolver<'src> {
@@ -29,12 +31,14 @@ impl<'src> Resolver<'src> {
         Self {
             scopes: vec![global_scope],
             locals: HashMap::new(),
+            in_loop: false,
+            parser: Parser::new(""),
         }
     }
 
     pub fn run(&mut self, src: &'src str) -> Result<(), ResolveError> {
-        let mut parser = Parser::new(src);
-        while let Some(stmt) = parser.next_stmt()? {
+        self.parser = Parser::new(src);
+        while let Some(stmt) = self.parser.next_stmt()? {
             self.resolve_stmt(&stmt)?;
         }
         Ok(())
@@ -111,7 +115,9 @@ impl<'src> Resolver<'src> {
             }
             Stmt::While { condition, body } => {
                 self.resolve_expr(condition)?;
+                self.in_loop = true;
                 self.resolve_stmt(body)?;
+                self.in_loop = false;
             }
             Stmt::For {
                 initializer,
@@ -119,6 +125,7 @@ impl<'src> Resolver<'src> {
                 increment,
                 body,
             } => {
+                self.begin_scope();
                 if let Some(initializer) = initializer {
                     self.resolve_stmt(initializer)?;
                 }
@@ -126,7 +133,10 @@ impl<'src> Resolver<'src> {
                 if let Some(increment) = increment {
                     self.resolve_expr(increment)?;
                 }
+                self.in_loop = true;
                 self.resolve_stmt(body)?;
+                self.in_loop = false;
+                self.end_scope();
             }
             Stmt::Return(expr) => {
                 if let Some(expr) = expr {
@@ -211,6 +221,10 @@ impl<'src> Resolver<'src> {
             return false;
         }
         self.cur_scope().contains_key(ident)
+    }
+
+    pub fn current_line(&self) -> usize {
+        self.parser.current_line()
     }
 }
 

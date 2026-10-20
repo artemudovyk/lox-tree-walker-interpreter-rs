@@ -450,3 +450,43 @@ fun foo(arg, arg) { // expect compile error
             "Error at 'arg': Already a variable with this name in this scope.",
         ));
 }
+
+#[test]
+fn does_not_trigger_invalid_redeclaration_rules_on_loop_scopes() {
+    let src = r#"
+// This program uses for loops and block scopes
+// to print the updates to the same variable
+var baz = "after";
+
+{
+    var baz = "before";
+
+    for (var baz = 0; baz < 1; baz = baz + 1) {
+         print baz;
+         var baz = -1;
+         print baz;
+    }
+}
+
+{
+    for (var baz = 0; baz > 0; baz = baz + 1) {}
+
+    var baz = "after";
+    print baz;
+
+    for (baz = 0; baz < 1; baz = baz + 1) {
+        print baz;
+    }
+}
+
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0\n-1"));
+}

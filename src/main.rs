@@ -87,18 +87,15 @@ fn main() {
             match runtime.run(&file_contents) {
                 Ok(_) => {}
                 Err(RuntimeError::ResolveError(err)) => {
-                    eprintln!("{err}");
+                    eprintln!("[line {}] {}", runtime.current_line(), err);
                     std::process::exit(65);
                 }
                 Err(RuntimeError::ParseError(parse_error)) => {
-                    eprintln!("{parse_error}");
+                    eprintln!("[line {}] {}", runtime.current_line(), parse_error);
                     std::process::exit(65);
                 }
                 Err(runtime_error) => {
-                    eprintln!("{runtime_error}");
-                    // TODO: change later
-                    eprintln!("[line 1]");
-                    // eprintln!("[line {}]", parser.current_line());
+                    eprintln!("[line {}] {}", runtime.current_line(), runtime_error);
                     std::process::exit(70);
                 }
             }

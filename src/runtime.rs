@@ -34,6 +34,7 @@ pub enum RuntimeError {
 pub struct Runtime<'src, W: Write> {
     out: W,
     env: Rc<RefCell<Env<'src>>>,
+    parser: Parser<'src>,
     resolver: Resolver<'src>,
 }
 
@@ -45,6 +46,7 @@ impl<'src> Runtime<'src, std::io::Stdout> {
         Self {
             out: std::io::stdout(),
             env: Rc::new(RefCell::new(env)),
+            parser: Parser::new(""),
             resolver: Resolver::new(),
         }
     }
@@ -58,14 +60,15 @@ impl<'src, W: Write> Runtime<'src, W> {
         Self {
             out: writer,
             env: Rc::new(RefCell::new(env)),
+            parser: Parser::new(""),
             resolver: Resolver::new(),
         }
     }
 
     pub fn run(&mut self, src: &'src str) -> Result<(), RuntimeError> {
-        let mut parser = Parser::new(src);
+        self.parser = Parser::new(src);
         self.resolver.run(src)?;
-        while let Some(stmt) = parser.next_stmt()? {
+        while let Some(stmt) = self.parser.next_stmt()? {
             self.exec_stmt(stmt)?;
         }
         Ok(())
@@ -436,6 +439,10 @@ impl<'src, W: Write> Runtime<'src, W> {
             return Ok(());
         }
         panic!("Can't look up atom of type other than Ident");
+    }
+
+    pub fn current_line(&self) -> usize {
+        std::cmp::max(self.parser.current_line(), self.resolver.current_line())
     }
 }
 
