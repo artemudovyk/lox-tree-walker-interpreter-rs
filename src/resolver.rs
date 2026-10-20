@@ -12,6 +12,8 @@ pub enum ResolveError {
     UndeclaredVar(String),
     #[error("Error at '{0}': Already a variable with this name in this scope.")]
     RedeclarationInLocalScope(String),
+    #[error("Error at 'return': Can't return from top-level code.")]
+    InvalidReturn,
 }
 
 type Scope<'src> = HashMap<&'src str, bool>;
@@ -19,8 +21,9 @@ type Scope<'src> = HashMap<&'src str, bool>;
 pub struct Resolver<'src> {
     scopes: Vec<Scope<'src>>,
     pub locals: HashMap<String, usize>,
-    in_loop: bool,
     parser: Parser<'src>,
+    in_loop: bool,
+    in_func: bool,
 }
 
 impl<'src> Resolver<'src> {
@@ -31,8 +34,9 @@ impl<'src> Resolver<'src> {
         Self {
             scopes: vec![global_scope],
             locals: HashMap::new(),
-            in_loop: false,
             parser: Parser::new(""),
+            in_loop: false,
+            in_func: false,
         }
     }
 
@@ -139,6 +143,9 @@ impl<'src> Resolver<'src> {
                 self.end_scope();
             }
             Stmt::Return(expr) => {
+                if !self.in_func {
+                    return Err(ResolveError::InvalidReturn);
+                }
                 if let Some(expr) = expr {
                     self.resolve_expr(expr)?;
                 }
@@ -158,9 +165,11 @@ impl<'src> Resolver<'src> {
                     self.declare(param);
                     self.define(param);
                 }
+                self.in_func = true;
                 for stmt in body {
                     self.resolve_stmt(stmt)?;
                 }
+                self.in_func = false;
                 self.end_scope();
             }
         }

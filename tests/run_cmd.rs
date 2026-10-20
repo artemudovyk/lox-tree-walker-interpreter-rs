@@ -518,3 +518,27 @@ for (var foo = 0; foo < 2;) {
         .success()
         .stdout(predicate::str::contains("0\n1\n0\n1"));
 }
+
+#[test]
+fn detects_invalid_return_statements_outside_functions() {
+    let src = r#"
+fun foo() {
+  return "at function scope is ok";
+}
+
+return;
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Error at 'return': Can't return from top-level code.",
+        ));
+}
