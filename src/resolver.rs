@@ -23,7 +23,7 @@ pub struct Resolver<'src> {
     pub locals: HashMap<String, usize>,
     parser: Parser<'src>,
     in_loop: bool,
-    in_func: bool,
+    cur_func: Option<&'src str>,
 }
 
 impl<'src> Resolver<'src> {
@@ -36,7 +36,7 @@ impl<'src> Resolver<'src> {
             locals: HashMap::new(),
             parser: Parser::new(""),
             in_loop: false,
-            in_func: false,
+            cur_func: None,
         }
     }
 
@@ -143,7 +143,7 @@ impl<'src> Resolver<'src> {
                 self.end_scope();
             }
             Stmt::Return(expr) => {
-                if !self.in_func {
+                if self.cur_func.is_none() {
                     return Err(ResolveError::InvalidReturn);
                 }
                 if let Some(expr) = expr {
@@ -165,11 +165,12 @@ impl<'src> Resolver<'src> {
                     self.declare(param);
                     self.define(param);
                 }
-                self.in_func = true;
+                let old_func = self.cur_func;
+                self.cur_func = Some(ident);
                 for stmt in body {
                     self.resolve_stmt(stmt)?;
                 }
-                self.in_func = false;
+                self.cur_func = old_func;
                 self.end_scope();
             }
         }
