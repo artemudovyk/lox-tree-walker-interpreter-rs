@@ -380,6 +380,8 @@ impl<'src, W: Write> Runtime<'src, W> {
                 increment,
                 body,
             } => {
+                let prev_env = self.env.clone();
+                self.env = Rc::new(RefCell::new(Env::new_with_outer(self.env.clone())));
                 if let Some(init) = initializer {
                     self.exec_stmt(*init)?;
                 }
@@ -396,6 +398,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                         break;
                     }
                 }
+                self.env = prev_env;
                 Ok(None)
             }
             Stmt::FunDecl {

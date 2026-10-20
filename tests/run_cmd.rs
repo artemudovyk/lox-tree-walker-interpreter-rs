@@ -478,7 +478,6 @@ var baz = "after";
         print baz;
     }
 }
-
     "#;
     let mut file = tempfile::NamedTempFile::new().unwrap();
     writeln!(file, "{}", src).unwrap();
@@ -489,4 +488,33 @@ var baz = "after";
         .assert()
         .success()
         .stdout(predicate::str::contains("0\n-1"));
+}
+
+#[test]
+fn counter_outside_of_for_loop_initializer() {
+    let src = r#"
+// This program uses a for loop to print the
+// numbers from 0 to 2
+// The loop initializer is ignored in this loop
+var world = 0;
+for (; world < 2; world = world + 1) print world;
+
+// This program uses a for loop to print the
+// numbers from 0 to 2
+// The loop increment clause is ignored in this
+// loop
+for (var foo = 0; foo < 2;) {
+  print foo;
+  foo = foo + 1;
+}
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("0\n1\n0\n1"));
 }
