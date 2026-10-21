@@ -597,5 +597,5 @@ print Spaceship;
         .arg(file.path())
         .assert()
         .success()
-        .stdout(predicate::str::contains("Spaceship"));
+        .stdout(predicate::str::starts_with("Spaceship"));
 }

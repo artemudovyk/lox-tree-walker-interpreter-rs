@@ -491,7 +491,7 @@ impl<'src> std::fmt::Display for Value<'src> {
             // Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
-            Self::Class(cls) => write!(f, "<class {}>", cls.ident),
+            Self::Class(cls) => write!(f, "{}", cls.ident),
         }
     }
 }
