@@ -56,6 +56,7 @@ pub enum Stmt<'src> {
     },
     ClassDecl {
         ident: &'src str,
+        methods: Vec<Stmt<'src>>,
     },
 }
 
@@ -127,7 +128,13 @@ impl<'src> std::fmt::Display for Stmt<'src> {
                     write!(f, "(return)")
                 }
             }
-            Self::ClassDecl { ident } => write!(f, "(class {ident})"),
+            Self::ClassDecl { ident, methods } => {
+                write!(f, "(class {ident}")?;
+                for method in methods {
+                    write!(f, " {}", method)?;
+                }
+                write!(f, ")")
+            }
         }
     }
 }
@@ -346,6 +353,7 @@ impl<'src> TryFrom<Token<'src>> for Op {
 pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
+    in_class: bool,
 }
 
 #[allow(dead_code)]
@@ -354,6 +362,7 @@ impl<'src> Parser<'src> {
         Self {
             src,
             lexer: Lexer::new(src),
+            in_class: false,
         }
     }
 
@@ -397,6 +406,9 @@ impl<'src> Parser<'src> {
                 TokenKind::Comment => {
                     self.lexer.advance();
                 }
+                // Treat all identifiers in the block as function declarations if we are inside the
+                // class declaration.
+                TokenKind::Ident if self.in_class => statements.push(self.parse_function()?),
                 _ => statements.push(
                     self.next_stmt()?
                         .expect("Statement is expected at this point"),
@@ -404,6 +416,35 @@ impl<'src> Parser<'src> {
             }
         }
         Ok(statements)
+    }
+
+    fn parse_function(&mut self) -> Result<Stmt<'src>, ParseError> {
+        let ident = self
+            .expect_token(TokenKind::Ident, "Expect identifier.")?
+            .lexeme;
+        self.expect_token(TokenKind::LeftParen, "Expect a '('.")?;
+        let mut params = vec![];
+        while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
+            let t = self.lexer.next_token();
+            match t.kind {
+                TokenKind::Ident => {
+                    params.push(t.lexeme);
+                    if matches!(self.lexer.peek().kind, TokenKind::Ident) {
+                        return Err(ParseError::MissingCommaBetweenParameters);
+                    }
+                }
+                TokenKind::Comma => continue,
+                _ => panic!("Unexpected token"),
+            }
+        }
+        self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
+        self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
+        let body = self.parse_block()?;
+        Ok(Stmt::FunDecl {
+            ident,
+            parameters: params,
+            body,
+        })
     }
 
     pub fn next_stmt(&mut self) -> Result<Option<Stmt<'src>>, ParseError> {
@@ -536,41 +577,19 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::Fun) => {
                     self.lexer.advance(); // step over `fun` keyword
-                    let ident = self
-                        .expect_token(TokenKind::Ident, "Expect identifier.")?
-                        .lexeme;
-                    self.expect_token(TokenKind::LeftParen, "Expect a '('.")?;
-                    let mut params = vec![];
-                    while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
-                        let t = self.lexer.next_token();
-                        match t.kind {
-                            TokenKind::Ident => {
-                                params.push(t.lexeme);
-                                if matches!(self.lexer.peek().kind, TokenKind::Ident) {
-                                    return Err(ParseError::MissingCommaBetweenParameters);
-                                }
-                            }
-                            TokenKind::Comma => continue,
-                            _ => panic!("Unexpected token"),
-                        }
-                    }
-                    self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
-                    self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
-                    let body = self.parse_block()?;
-                    return Ok(Some(Stmt::FunDecl {
-                        ident,
-                        parameters: params,
-                        body,
-                    }));
+                    let func = self.parse_function()?;
+                    return Ok(Some(func));
                 }
                 TokenKind::Keyword(Keyword::Class) => {
                     self.lexer.advance(); // step over `class` keyword
+                    self.in_class = true;
                     let ident = self
-                        .expect_token(TokenKind::Ident, "Expect identifier.")?
+                        .expect_token(TokenKind::Ident, "Expect class name identifier.")?
                         .lexeme;
-                    self.expect_token(TokenKind::LeftBrace, "Expect a '{'.")?;
-                    let _body = self.parse_block()?;
-                    return Ok(Some(Stmt::ClassDecl { ident }));
+                    self.expect_token(TokenKind::LeftBrace, "Expect a '{' after the class name.")?;
+                    let methods = self.parse_block()?;
+                    self.in_class = false;
+                    return Ok(Some(Stmt::ClassDecl { ident, methods }));
                 }
                 TokenKind::Keyword(Keyword::Return) => {
                     self.lexer.advance();
@@ -1326,5 +1345,24 @@ mod tests {
         let mut parser = Parser::new(src);
         let stmt = parser.next_stmt().unwrap().unwrap();
         assert_eq!(format!("{stmt}"), "(class Spaceship)");
+    }
+
+    #[test]
+    fn class_declaration_with_methods() {
+        let src = r#"
+        class Spaceship {
+            burn() {}
+
+            land(planet) {
+                print planet;
+            }
+        }
+        "#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(
+            format!("{stmt}"),
+            "(class Spaceship (fun burn (block)) (fun land planet (block (print planet))))"
+        );
     }
 }
