@@ -308,7 +308,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                             let instance = Value::ClassInstance(ClassInstance {
                                 class_ident: ident,
                             });
-                            self.env.borrow_mut().set(ident, instance.clone());
                             Ok(instance)
                         }
                         _ => Err(RuntimeError::UncallableType),

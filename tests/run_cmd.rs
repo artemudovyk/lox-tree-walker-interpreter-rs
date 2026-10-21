@@ -617,3 +617,29 @@ print bagel;
         .success()
         .stdout(predicate::str::starts_with("Bagel instance"));
 }
+
+#[test]
+fn can_instantiate_multiple_instances_of_the_class() {
+    let src = r#"
+// Instantiating multiple instances of a class
+// should work
+class Robot {}
+var r1 = Robot();
+var r2 = Robot();
+
+print "Created multiple robots:";
+print r1;
+print r2;
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with(
+            "Created multiple robots:\nRobot instance\nRobot instance",
+        ));
+}
