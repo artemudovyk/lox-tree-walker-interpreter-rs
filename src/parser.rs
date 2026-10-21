@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-use std::hash::Hash;
-
 use crate::lexer::{Keyword, Lexer, Literal, Token, TokenKind};
 
 #[derive(Debug, thiserror::Error, PartialEq)]
@@ -341,11 +338,13 @@ impl<'src> TryFrom<Token<'src>> for Op {
     }
 }
 
+#[allow(dead_code)]
 pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
 }
 
+#[allow(dead_code)]
 impl<'src> Parser<'src> {
     pub fn new(src: &'src str) -> Self {
         Self {

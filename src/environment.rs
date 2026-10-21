@@ -1,7 +1,4 @@
-use crate::{
-    resolver::ResolveError,
-    runtime::{RuntimeError, Value},
-};
+use crate::runtime::{RuntimeError, Value};
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 type Enclosure<'src> = Rc<RefCell<Env<'src>>>;
