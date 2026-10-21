@@ -420,7 +420,11 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Some(expr) => self.eval_expr(&expr).map(Option::from),
                 None => Ok(Some(Value::Nil)),
             },
-            Stmt::ClassDecl { .. } => Ok(None),
+            Stmt::ClassDecl { ident, methods } => {
+                let class = Value::Class(Class { ident, methods });
+                self.env.borrow_mut().set(ident, class);
+                Ok(None)
+            }
         }
     }
 
@@ -464,6 +468,7 @@ pub enum Value<'src> {
     Nil,
     Func(Func<'src>),
     NativeFunc(NativeFunc),
+    Class(Class<'src>),
 }
 
 impl<'src> Value<'src> {
@@ -486,8 +491,15 @@ impl<'src> std::fmt::Display for Value<'src> {
             // Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
+            Self::Class(cls) => write!(f, "<class {}>", cls.ident),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class<'src> {
+    pub ident: &'src str,
+    pub methods: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]

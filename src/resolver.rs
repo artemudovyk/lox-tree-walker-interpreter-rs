@@ -173,7 +173,10 @@ impl<'src> Resolver<'src> {
                 self.cur_func = old_func;
                 self.end_scope();
             }
-            Stmt::ClassDecl { .. } => {}
+            Stmt::ClassDecl { ident, .. } => {
+                self.declare(ident);
+                self.define(ident);
+            }
         }
         Ok(())
     }

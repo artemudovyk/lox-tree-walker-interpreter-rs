@@ -582,3 +582,20 @@ var count = 0;
         .assert()
         .success();
 }
+
+#[test]
+fn print_class_identifier_prints_it() {
+    let src = r#"
+class Spaceship {}
+print Spaceship;
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Spaceship"));
+}
