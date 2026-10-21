@@ -54,6 +54,9 @@ pub enum Stmt<'src> {
         parameters: Vec<&'src str>,
         body: Vec<Stmt<'src>>,
     },
+    ClassDecl {
+        ident: &'src str,
+    },
 }
 
 impl<'src> std::fmt::Display for Stmt<'src> {
@@ -124,6 +127,7 @@ impl<'src> std::fmt::Display for Stmt<'src> {
                     write!(f, "(return)")
                 }
             }
+            Self::ClassDecl { ident } => write!(f, "(class {ident})"),
         }
     }
 }
@@ -531,7 +535,7 @@ impl<'src> Parser<'src> {
                     }));
                 }
                 TokenKind::Keyword(Keyword::Fun) => {
-                    self.lexer.advance(); // skip over `fun` keyword
+                    self.lexer.advance(); // step over `fun` keyword
                     let ident = self
                         .expect_token(TokenKind::Ident, "Expect identifier.")?
                         .lexeme;
@@ -558,6 +562,15 @@ impl<'src> Parser<'src> {
                         parameters: params,
                         body,
                     }));
+                }
+                TokenKind::Keyword(Keyword::Class) => {
+                    self.lexer.advance(); // step over `class` keyword
+                    let ident = self
+                        .expect_token(TokenKind::Ident, "Expect identifier.")?
+                        .lexeme;
+                    self.expect_token(TokenKind::LeftBrace, "Expect a '{'.")?;
+                    let _body = self.parse_block()?;
+                    return Ok(Some(Stmt::ClassDecl { ident }));
                 }
                 TokenKind::Keyword(Keyword::Return) => {
                     self.lexer.advance();
@@ -1303,5 +1316,15 @@ mod tests {
         let mut parser = Parser::new(src);
         let stmt = parser.next_stmt().unwrap().unwrap();
         assert_eq!(format!("{stmt}"), "(block (call f))");
+    }
+
+    #[test]
+    fn class_declaration() {
+        let src = r#"
+        class Spaceship {}
+        "#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(class Spaceship)");
     }
 }

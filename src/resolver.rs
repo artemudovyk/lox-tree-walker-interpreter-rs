@@ -173,6 +173,7 @@ impl<'src> Resolver<'src> {
                 self.cur_func = old_func;
                 self.end_scope();
             }
+            Stmt::ClassDecl { .. } => {}
         }
         Ok(())
     }

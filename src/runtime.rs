@@ -420,6 +420,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Some(expr) => self.eval_expr(&expr).map(Option::from),
                 None => Ok(Some(Value::Nil)),
             },
+            Stmt::ClassDecl { .. } => Ok(None),
         }
     }
 
