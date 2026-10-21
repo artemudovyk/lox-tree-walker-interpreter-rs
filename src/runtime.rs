@@ -304,6 +304,13 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                             Ok(val.unwrap_or(Value::Nil))
                         }
+                        Value::Class(Class { ident, .. }) => {
+                            let instance = Value::ClassInstance(ClassInstance {
+                                class_ident: ident,
+                            });
+                            self.env.borrow_mut().set(ident, instance.clone());
+                            Ok(instance)
+                        }
                         _ => Err(RuntimeError::UncallableType),
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands for this operation".to_owned())),
@@ -469,6 +476,7 @@ pub enum Value<'src> {
     Func(Func<'src>),
     NativeFunc(NativeFunc),
     Class(Class<'src>),
+    ClassInstance(ClassInstance<'src>),
 }
 
 impl<'src> Value<'src> {
@@ -492,14 +500,9 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
             Self::Class(cls) => write!(f, "{}", cls.ident),
+            Self::ClassInstance(instance) => write!(f, "{} instance", instance.class_ident),
         }
     }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct Class<'src> {
-    pub ident: &'src str,
-    pub methods: Vec<Stmt<'src>>,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -521,6 +524,17 @@ impl std::fmt::Display for NativeFunc {
             Self::Clock => write!(f, "clock"),
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Class<'src> {
+    pub ident: &'src str,
+    pub methods: Vec<Stmt<'src>>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ClassInstance<'src> {
+    pub class_ident: &'src str,
 }
 
 #[cfg(test)]

@@ -599,3 +599,21 @@ print Spaceship;
         .success()
         .stdout(predicate::str::starts_with("Spaceship"));
 }
+
+#[test]
+fn print_class_instance_prints_class_name_instance() {
+    let src = r#"
+class Bagel {}
+var bagel = Bagel();
+print bagel;
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with("Bagel instance"));
+}
