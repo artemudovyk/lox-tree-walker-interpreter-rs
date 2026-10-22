@@ -728,3 +728,39 @@ print batman.called;
             "Times Superman was called:\n66\nTimes Batman was called:\n18",
         ));
 }
+
+#[test]
+fn functions_should_accept_class_instances_and_mutate_them() {
+    let src = r#"
+class Wizard {}
+var gandalf = Wizard();
+
+gandalf.color = "Grey";
+gandalf.power = nil;
+print gandalf.color;
+
+// functions should be able to accept class
+// instances and get or set properties on them
+fun promote(wizard) {
+  wizard.color = "White";
+  if (false) {
+    wizard.power = 100;
+  } else {
+    wizard.power = 0;
+  }
+}
+
+promote(gandalf);
+print gandalf.color;
+print gandalf.power;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Grey\nWhite\n0"));
+}

@@ -242,8 +242,8 @@ impl<'src, W: Write> Runtime<'src, W> {
                         }
                         (Expr::Cons(Op::Dot, dot_args), val) => match dot_args.as_slice() {
                             [obj @ Expr::Atom(Atom::Ident { name: obj_name, .. }), Expr::Atom(Atom::Ident { name: property_name, .. })] => match self.eval_expr(obj)? {
-                                Value::ClassInstance(mut instance) => {
-                                    instance.set(property_name, val);
+                                Value::ClassInstance(instance) => {
+                                    instance.borrow_mut().set(property_name, val);
                                     self.env.borrow_mut().set(obj_name, Value::ClassInstance(instance));
                                     Ok(Value::Nil)
                                 }
@@ -284,7 +284,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Op::Dot => match args.as_slice() {
                     [obj, Expr::Atom(Atom::Ident { name: property, .. })] => {
                         match self.eval_expr(obj)? {
-                            Value::ClassInstance(instance) => instance.get(property),
+                            Value::ClassInstance(instance) => instance.borrow().get(property),
                             _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                         }
                         
@@ -333,10 +333,10 @@ impl<'src, W: Write> Runtime<'src, W> {
                             Ok(val.unwrap_or(Value::Nil))
                         }
                         Value::Class(Class { ident, .. }) => {
-                            let instance = Value::ClassInstance(ClassInstance {
+                            let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
                                 class_ident: ident,
                                 properties: HashMap::new(),
-                            });
+                            })));
                             Ok(instance)
                         }
                         _ => Err(RuntimeError::UncallableType),
@@ -504,7 +504,7 @@ pub enum Value<'src> {
     Func(Func<'src>),
     NativeFunc(NativeFunc),
     Class(Class<'src>),
-    ClassInstance(ClassInstance<'src>),
+    ClassInstance(Rc<RefCell<ClassInstance<'src>>>),
 }
 
 impl<'src> Value<'src> {
@@ -528,7 +528,7 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
             Self::Class(cls) => write!(f, "{}", cls.ident),
-            Self::ClassInstance(instance) => write!(f, "{} instance", instance.class_ident),
+            Self::ClassInstance(instance) => write!(f, "{} instance", instance.borrow().class_ident),
         }
     }
 }
