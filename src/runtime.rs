@@ -1,6 +1,7 @@
 use crate::environment::Env;
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
 use crate::resolver::{ResolveError, Resolver};
+use std::collections::HashMap;
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -17,8 +18,10 @@ pub enum RuntimeError {
     ParseError(#[from] ParseError),
     #[error(transparent)]
     ResolveError(#[from] ResolveError),
-    #[error("variable {0} is undeclared")]
+    #[error("variable '{0}' is undeclared")]
     UndeclaredVar(String),
+    #[error("property '{0}' is undefined")]
+    UndefinedProperty(String),
     #[error("Can only call functions and classes.")]
     UncallableType,
     #[error(
@@ -237,6 +240,21 @@ impl<'src, W: Write> Runtime<'src, W> {
                             self.update_ident(atom, val.clone())?;
                             Ok(val)
                         }
+                        (Expr::Cons(Op::Dot, dot_args), val) => match dot_args.as_slice() {
+                            [obj @ Expr::Atom(Atom::Ident { name: obj_name, .. }), Expr::Atom(Atom::Ident { name: property_name, .. })] => match self.eval_expr(obj)? {
+                                Value::ClassInstance(mut instance) => {
+                                    instance.set(property_name, val);
+                                    self.env.borrow_mut().set(obj_name, Value::ClassInstance(instance));
+                                    Ok(Value::Nil)
+                                }
+                                _ => Err(RuntimeError::TypeMismatch(
+                                    "Unsupported operand types for this operation.".to_owned(),
+                                ))?,
+                            }
+                            _ => Err(RuntimeError::TypeMismatch(
+                                "Unsupported operand types for this operation.".to_owned(),
+                            ))?,
+                        }
                         _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
                     },
                     _ => Err(RuntimeError::TypeMismatch("Assignment must be done on the variable and have an expression on the right side".to_owned()))
@@ -263,6 +281,16 @@ impl<'src, W: Write> Runtime<'src, W> {
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                     }
+                Op::Dot => match args.as_slice() {
+                    [obj, Expr::Atom(Atom::Ident { name: property, .. })] => {
+                        match self.eval_expr(obj)? {
+                            Value::ClassInstance(instance) => instance.get(property),
+                            _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
+                        }
+                        
+                    }
+                    _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
+                }
                 Op::Call => match args.as_slice() {
                     [callee, args @ ..] => match self.eval_expr(callee)? {
                         Value::NativeFunc(NativeFunc::Clock) => {
@@ -307,6 +335,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                         Value::Class(Class { ident, .. }) => {
                             let instance = Value::ClassInstance(ClassInstance {
                                 class_ident: ident,
+                                properties: HashMap::new(),
                             });
                             Ok(instance)
                         }
@@ -534,6 +563,20 @@ pub struct Class<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassInstance<'src> {
     pub class_ident: &'src str,
+    properties: HashMap<&'src str, Value<'src>>,
+}
+
+impl<'src> ClassInstance<'src> {
+    fn get(&self, property: &'src str) -> Result<Value<'src>, RuntimeError> {
+        self.properties
+            .get(property)
+            .cloned()
+            .ok_or_else(|| RuntimeError::UndefinedProperty(property.to_owned()))
+    }
+
+    fn set(&mut self, property: &'src str, value: Value<'src>) {
+        self.properties.insert(property, value);
+    }
 }
 
 #[cfg(test)]

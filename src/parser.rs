@@ -257,6 +257,7 @@ pub enum Op {
     And,
     Or,
     Call,
+    Dot,
 }
 
 impl std::fmt::Display for Op {
@@ -278,6 +279,7 @@ impl std::fmt::Display for Op {
             Self::And => write!(f, "and"),
             Self::Or => write!(f, "or"),
             Self::Call => write!(f, "call"),
+            Self::Dot => write!(f, "dot"),
         }
     }
 }
@@ -296,6 +298,7 @@ impl Op {
             | Self::NotEq => Some((6, 7)),
             Self::Add | Self::Minus => Some((8, 9)),
             Self::Mult | Self::Div => Some((10, 11)),
+            Self::Dot => Some((12, 13)),
             _ => None,
         }
     }
@@ -336,6 +339,7 @@ impl<'src> TryFrom<&Token<'src>> for Op {
             TokenKind::Keyword(Keyword::And) => Ok(Op::And),
             TokenKind::Keyword(Keyword::Or) => Ok(Op::Or),
             TokenKind::LeftParen => Ok(Op::Call),
+            TokenKind::Dot => Ok(Op::Dot),
             _ => Err(()),
         }
     }
@@ -667,6 +671,7 @@ impl<'src> Parser<'src> {
         loop {
             let peeked = self.lexer.peek();
             if let Ok(op) = Op::try_from(peeked) {
+                // TODO: continue from here. I work on property access.
                 if let Some(l_bp) = op.postfix_bp() {
                     if l_bp < min_bp {
                         break;
@@ -1363,6 +1368,25 @@ mod tests {
         assert_eq!(
             format!("{stmt}"),
             "(class Spaceship (fun burn (block)) (fun land planet (block (print planet))))"
+        );
+    }
+
+    #[test]
+    fn object_property_access() {
+        let src = r#"x.property_name = 1;"#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(= (dot x property_name) 1.0)");
+    }
+
+    #[test]
+    fn nested_object_property_access() {
+        let src = r#"x.property_name.subproperty = 1;"#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(
+            format!("{stmt}"),
+            "(= (dot (dot x property_name) subproperty) 1.0)"
         );
     }
 }

@@ -643,3 +643,88 @@ print r2;
             "Created multiple robots:\nRobot instance\nRobot instance",
         ));
 }
+
+#[test]
+fn can_init_and_read_class_instance_properties() {
+    let src = r#"
+// Basic property setting and getting
+class Spaceship {}
+var falcon = Spaceship();
+
+falcon.name = "Millennium Falcon";
+falcon.speed = 75.5;
+
+print "Ship details:";
+print falcon.name;
+print falcon.speed;
+    "#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::starts_with(
+            "Ship details:\nMillennium Falcon\n75.5",
+        ));
+}
+
+#[test]
+fn multiple_object_properties_and_conditional_access() {
+    let src = r#"
+// Multiple properties and conditional access
+class Robot {}
+var r2d2 = Robot();
+
+r2d2.model = "Astromech";
+r2d2.operational = false;
+
+if (r2d2.operational) {
+  print r2d2.model;
+  r2d2.mission = "Navigate hyperspace";
+  print r2d2.mission;
+}
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success();
+}
+
+#[test]
+fn multiple_instances_with_properties() {
+    let src = r#"
+// Multiple instances with properties
+class Superhero {}
+var batman = Superhero();
+var superman = Superhero();
+
+batman.name = "Batman";
+batman.called = 18;
+
+superman.name = "Superman";
+superman.called = 66;
+
+print "Times " + superman.name + " was called:";
+print superman.called;
+print "Times " + batman.name + " was called:";
+print batman.called;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Times Superman was called:\n66\nTimes Batman was called:\n18",
+        ));
+}
