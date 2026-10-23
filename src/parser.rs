@@ -298,7 +298,7 @@ impl Op {
             | Self::NotEq => Some((6, 7)),
             Self::Add | Self::Minus => Some((8, 9)),
             Self::Mult | Self::Div => Some((10, 11)),
-            Self::Dot => Some((12, 13)),
+            Self::Dot => Some((30, 29)),
             _ => None,
         }
     }
@@ -1388,5 +1388,13 @@ mod tests {
             format!("{stmt}"),
             "(= (dot (dot x property_name) subproperty) 1.0)"
         );
+    }
+
+    #[test]
+    fn method_call() {
+        let src = r#"x.method();"#;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(call (dot x method))");
     }
 }

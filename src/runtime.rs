@@ -332,11 +332,24 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                             Ok(val.unwrap_or(Value::Nil))
                         }
-                        Value::Class(Class { ident, .. }) => {
+                        Value::Class(Class { ident, methods }) => {
+                            let funcs = methods.iter().filter_map(|stmt| match stmt {
+                                Stmt::FunDecl { ident, parameters, body } => {
+                                    Some((*ident, Value::Func(Func { 
+                                        ident,
+                                        body: body.clone(),
+                                        parameters: parameters.clone(),
+                                        closure: self.env.clone(),
+                                    })))
+                                }
+                                _ => None,
+                            }).collect::<Vec<(&'src str, Value<'src>)>>();
+
                             let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
                                 class_ident: ident,
-                                properties: HashMap::new(),
+                                fields: HashMap::from_iter(funcs),
                             })));
+
                             Ok(instance)
                         }
                         _ => Err(RuntimeError::UncallableType),
@@ -563,19 +576,20 @@ pub struct Class<'src> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct ClassInstance<'src> {
     pub class_ident: &'src str,
-    properties: HashMap<&'src str, Value<'src>>,
+    fields: HashMap<&'src str, Value<'src>>,
+    // methods: HashMap<&'src str, Func<'src>>,
 }
 
 impl<'src> ClassInstance<'src> {
     fn get(&self, property: &'src str) -> Result<Value<'src>, RuntimeError> {
-        self.properties
+        self.fields
             .get(property)
             .cloned()
             .ok_or_else(|| RuntimeError::UndefinedProperty(property.to_owned()))
     }
 
     fn set(&mut self, property: &'src str, value: Value<'src>) {
-        self.properties.insert(property, value);
+        self.fields.insert(property, value);
     }
 }
 

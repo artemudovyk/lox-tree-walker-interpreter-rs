@@ -764,3 +764,28 @@ print gandalf.power;
         .success()
         .stdout(predicate::str::contains("Grey\nWhite\n0"));
 }
+
+#[test]
+fn can_call_class_method() {
+    let src = r#"
+class Robot {
+  beep() {
+    print "Beep boop!";
+  }
+}
+
+var r2d2 = Robot();
+r2d2.beep();
+
+Robot().beep();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Beep boop!\nBeep boop!"));
+}
