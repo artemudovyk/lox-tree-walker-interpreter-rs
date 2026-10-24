@@ -1225,3 +1225,89 @@ print baz.secret;
         .success()
         .stdout(predicate::str::contains("42"));
 }
+
+#[test]
+fn subclass_methods_overrides_same_named_methods_from_superclass() {
+    let src = r#"
+class A {
+  method() {
+    print "A method";
+  }
+}
+
+// B inherits method `method` from A
+// and overrides it with a new implementation
+class B < A {
+  method() {
+    print "B method";
+  }
+}
+
+var b = B();
+b.method();  // expect: B method
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("B method"));
+}
+
+#[test]
+fn class_methods_are_overriden_top_to_bottom() {
+    let src = r#"
+class Animal {
+  speak() {
+    return "Animal speaks";
+  }
+
+  makeSound() {
+    return "Generic sound";
+  }
+
+  communicate() {
+    return this.speak() + " : " + this.makeSound();
+  }
+}
+
+class Dog < Animal {
+  speak() {
+    return "Dog speaks";
+  }
+
+  makeSound() {
+    return "Woof";
+  }
+}
+
+class Puppy < Dog {
+  speak() {
+    return "Puppy speaks";
+  }
+}
+
+var animal = Animal();
+var dog = Dog();
+var puppy = Puppy();
+
+print animal.communicate();
+print dog.communicate();
+print puppy.communicate();"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Animal speaks : Generic sound
+Dog speaks : Woof
+Puppy speaks : Woof",
+        ));
+}

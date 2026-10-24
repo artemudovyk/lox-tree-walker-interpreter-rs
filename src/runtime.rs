@@ -360,7 +360,24 @@ impl<'src, W: Write> Runtime<'src, W> {
                             // TODO: replace this VecDeque later. Do not want to reorganize logic at
                             // the moment to push initializers in the proper order.
                             let mut initializers = VecDeque::new();
-                            let mut funcs = vec![];
+                            let mut funcs: HashMap<&'src str, Value<'src>> = HashMap::new();
+
+                            // Class methods
+                            for stmt in methods {
+                                if let Stmt::FunDecl { ident, parameters, body } = stmt {
+                                    let func = Func {
+                                        ident,
+                                        body: body.clone(),
+                                        parameters: parameters.clone(),
+                                        closure: self.env.clone(),
+                                        is_initializer: ident == "init",
+                                    };
+                                    if ident == "init" {
+                                        initializers.push_back(func.clone())
+                                    }
+                                    funcs.entry(ident).or_insert(Value::Func(func));
+                                }
+                            }
 
                             // Superclass methods
                             let mut current_superclass = superclass;
@@ -369,8 +386,8 @@ impl<'src, W: Write> Runtime<'src, W> {
                                     return Err(RuntimeError::NotAClass(sc_name.to_string()));
                                 };
 
-                                let sc_methods = superclass.methods.iter().filter_map(|stmt| match stmt {
-                                    Stmt::FunDecl { ident, parameters, body } => {
+                                for stmt in superclass.methods {
+                                    if let Stmt::FunDecl { ident, parameters, body } = stmt {
                                         let func = Func {
                                             ident,
                                             body: body.clone(),
@@ -378,39 +395,20 @@ impl<'src, W: Write> Runtime<'src, W> {
                                             closure: self.env.clone(),
                                             is_initializer: superclass.ident == "init",
                                         };
-                                        if *ident == "init" {
+                                        if ident == "init" {
                                             initializers.push_back(func.clone())
                                         }
-                                        Some((*ident, Value::Func(func)))
+                                        funcs.entry(ident).or_insert(Value::Func(func));
                                     }
-                                    _ => None,
-                                }).collect::<Vec<(&'src str, Value<'src>)>>();
+                                }
 
-                                funcs.extend(sc_methods);
                                 current_superclass = superclass.superclass;
                             }
 
-                            // Class methods
-                            funcs.extend(methods.iter().filter_map(|stmt| match stmt {
-                                Stmt::FunDecl { ident, parameters, body } => {
-                                    let func = Func {
-                                        ident,
-                                        body: body.clone(),
-                                        parameters: parameters.clone(),
-                                        closure: self.env.clone(),
-                                        is_initializer: *ident == "init",
-                                    };
-                                    if *ident == "init" {
-                                        initializers.push_front(func.clone())
-                                    }
-                                    Some((*ident, Value::Func(func)))
-                                }
-                                _ => None,
-                            }).collect::<Vec<(&'src str, Value<'src>)>>());
 
                             let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
                                 class_ident: ident,
-                                fields: HashMap::from_iter(funcs),
+                                fields: funcs,
                             })));
 
                             // Run all initializers in reverse order
