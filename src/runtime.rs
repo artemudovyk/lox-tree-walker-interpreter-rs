@@ -346,22 +346,49 @@ impl<'src, W: Write> Runtime<'src, W> {
                             Ok(val.unwrap_or(Value::Nil))
                         }
                         Value::Class(Class { ident, methods }) => {
+                            let mut initializer = None;
                             let funcs = methods.iter().filter_map(|stmt| match stmt {
                                 Stmt::FunDecl { ident, parameters, body } => {
-                                    Some((*ident, Value::Func(Func { 
+                                    let func = Func { 
                                         ident,
                                         body: body.clone(),
                                         parameters: parameters.clone(),
                                         closure: self.env.clone(),
-                                    })))
+                                    };
+                                    if *ident == "init" {
+                                        initializer = Some(func.clone())
+                                    }
+                                    Some((*ident, Value::Func(func)))
                                 }
                                 _ => None,
                             }).collect::<Vec<(&'src str, Value<'src>)>>();
+
 
                             let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
                                 class_ident: ident,
                                 fields: HashMap::from_iter(funcs),
                             })));
+
+                            if let Some(initializer) = initializer {
+                                let prev_env = self.env.clone();
+                                let mut env = initializer.closure.borrow().clone();
+                                env.set("this", instance.clone());
+                                self.env = Rc::new(RefCell::new(env));
+
+                                let args = args.iter().map(|arg| self.eval_expr(arg)).collect::<Result<Vec<_>, _>>()?;
+                                for (param, arg) in initializer.parameters.iter().zip(args) {
+                                    self.env.borrow_mut().set(param, arg);
+                                }
+
+                                for stmt in initializer.body {
+                                    let val = self.exec_stmt(stmt)?;
+                                    if val.is_some() {
+                                        break;
+                                    }
+                                }
+
+                                self.env = prev_env;
+                            }
 
                             Ok(instance)
                         }

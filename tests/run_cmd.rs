@@ -949,3 +949,26 @@ print this;
             "Can't use 'this' outside of a class.",
         ));
 }
+
+#[test]
+fn init_constructor_called_if_present_on_class_instantiation() {
+    let src = r#"
+class Default {
+  init() {
+    this.x = "bar";
+    this.y = 91;
+  }
+}
+print Default().x;
+print Default().y;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("bar\n91"));
+}
