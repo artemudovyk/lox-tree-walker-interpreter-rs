@@ -99,7 +99,7 @@ impl<'src, W: Write> Runtime<'src, W> {
             },
             Expr::Cons(op, args) => match op {
                 Op::Add => match args.as_slice() {
-                    [left, right] => match (dbg!(self.eval_expr(left)?), dbg!(self.eval_expr(right)?)) {
+                    [left, right] => match (self.eval_expr(left)?, self.eval_expr(right)?) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                         (Value::String(l), Value::String(r)) => {
                             Ok(Value::String(Cow::Owned(format!("{l}{r}"))))
@@ -379,7 +379,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                             is_initializer: superclass.ident == "init",
                                         };
                                         if *ident == "init" {
-                                            dbg!(initializers.push_back(func.clone()))
+                                            initializers.push_back(func.clone())
                                         }
                                         Some((*ident, Value::Func(func)))
                                     }
@@ -401,7 +401,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         is_initializer: *ident == "init",
                                     };
                                     if *ident == "init" {
-                                        dbg!(initializers.push_front(func.clone()))
+                                        initializers.push_front(func.clone())
                                     }
                                     Some((*ident, Value::Func(func)))
                                 }
@@ -414,7 +414,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                             })));
 
                             // Run all initializers in reverse order
-                            for initializer in dbg!(initializers.into_iter().rev()) {
+                            for initializer in initializers.into_iter().rev() {
                                 let prev_env = self.env.clone();
                                 let mut env = initializer.closure.borrow().clone();
                                 // TODO: think about how to avoid this cloning multiple times, and
@@ -429,7 +429,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 }
 
                                 for stmt in initializer.body {
-                                    let val = self.exec_stmt(dbg!(stmt))?;
+                                    let val = self.exec_stmt(stmt)?;
                                     if let Some(v) = val && !matches!(v, Value::Nil) {
                                         return Err(RuntimeError::InvalidInitializerReturn)
                                     }
