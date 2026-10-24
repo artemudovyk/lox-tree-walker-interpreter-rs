@@ -1193,3 +1193,35 @@ Method defined in Parent
 Method defined in Child",
         ));
 }
+
+#[test]
+fn subclass_runs_superclass_constructors() {
+    let src = r#"
+class Foo {
+  init() {
+    this.secret = 42;
+  }
+}
+
+// Bar is a subclass of Foo
+class Bar < Foo {}
+
+// Baz is a subclass of Bar
+class Baz < Bar {}
+
+var baz = Baz();
+
+// Baz should inherit the constructor from Foo
+// which should set the secret value to 42
+print baz.secret;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("42"));
+}

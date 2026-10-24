@@ -1,7 +1,7 @@
 use crate::environment::Env;
 use crate::parser::{Atom, Expr, Op, ParseError, Parser, Stmt};
 use crate::resolver::{ResolveError, Resolver};
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::{
     borrow::Cow,
     cell::RefCell,
@@ -357,9 +357,12 @@ impl<'src, W: Write> Runtime<'src, W> {
                             Ok(val.unwrap_or(Value::Nil))
                         }
                         Value::Class(Class { ident, superclass, methods }) => {
-                            let mut initializer = None;
+                            // TODO: replace this VecDeque later. Do not want to reorganize logic at
+                            // the moment to push initializers in the proper order.
+                            let mut initializers = VecDeque::new();
                             let mut funcs = vec![];
 
+                            // Superclass methods
                             let mut current_superclass = superclass;
                             while let Some(sc_name) = current_superclass {
                                 let Some(Value::Class(superclass)) = self.env.borrow().get(sc_name) else {
@@ -373,8 +376,11 @@ impl<'src, W: Write> Runtime<'src, W> {
                                             body: body.clone(),
                                             parameters: parameters.clone(),
                                             closure: self.env.clone(),
-                                            is_initializer: *ident == "init",
+                                            is_initializer: superclass.ident == "init",
                                         };
+                                        if *ident == "init" {
+                                            dbg!(initializers.push_back(func.clone()))
+                                        }
                                         Some((*ident, Value::Func(func)))
                                     }
                                     _ => None,
@@ -384,6 +390,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 current_superclass = superclass.superclass;
                             }
 
+                            // Class methods
                             funcs.extend(methods.iter().filter_map(|stmt| match stmt {
                                 Stmt::FunDecl { ident, parameters, body } => {
                                     let func = Func {
@@ -394,7 +401,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         is_initializer: *ident == "init",
                                     };
                                     if *ident == "init" {
-                                        initializer = Some(func.clone())
+                                        dbg!(initializers.push_front(func.clone()))
                                     }
                                     Some((*ident, Value::Func(func)))
                                 }
@@ -406,19 +413,23 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 fields: HashMap::from_iter(funcs),
                             })));
 
-                            if let Some(initializer) = initializer {
+                            // Run all initializers in reverse order
+                            for initializer in dbg!(initializers.into_iter().rev()) {
                                 let prev_env = self.env.clone();
                                 let mut env = initializer.closure.borrow().clone();
+                                // TODO: think about how to avoid this cloning multiple times, and
+                                // the env initialization overall
                                 env.set("this", instance.clone());
                                 self.env = Rc::new(RefCell::new(env));
 
+                                // TODO: not right for superclass initializers - take a look at it later
                                 let args = args.iter().map(|arg| self.eval_expr(arg)).collect::<Result<Vec<_>, _>>()?;
                                 for (param, arg) in initializer.parameters.iter().zip(args) {
                                     self.env.borrow_mut().set(param, arg);
                                 }
 
                                 for stmt in initializer.body {
-                                    let val = self.exec_stmt(stmt)?;
+                                    let val = self.exec_stmt(dbg!(stmt))?;
                                     if let Some(v) = val && !matches!(v, Value::Nil) {
                                         return Err(RuntimeError::InvalidInitializerReturn)
                                     }
