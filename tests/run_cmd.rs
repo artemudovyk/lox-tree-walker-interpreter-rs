@@ -1007,3 +1007,49 @@ print instance.init(51).count;
             "startValue can't be negative\n0\n51",
         ));
 }
+
+#[test]
+fn does_not_allow_to_return_value_from_constructor() {
+    let src = r#"
+class Foo {
+  init() {
+    return "something else";
+  }
+}
+
+Foo();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Can't return a value from an initializer.",
+        ));
+}
+
+#[test]
+fn empty_return_from_class_initializer_allowed() {
+    let src = r#"
+class Person {
+  init() {
+    print "world";
+    return;
+  }
+}
+
+Person();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success();
+}

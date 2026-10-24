@@ -32,6 +32,8 @@ pub enum RuntimeError {
         expected_args_num: u16,
         got_args_num: u16,
     },
+    #[error("Can't return a value from an initializer.")]
+    InvalidInitializerReturn,
 }
 
 pub struct Runtime<'src, W: Write> {
@@ -343,6 +345,9 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                             // If initializer, return an instance itself it `init` called directly.
                             if func.is_initializer {
+                                if let Some(v) = val && !matches!(v, Value::Nil) {
+                                    return Err(RuntimeError::InvalidInitializerReturn)
+                                }
                                 val = self.env.borrow().get("this");
                             }
 
@@ -388,8 +393,8 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                                 for stmt in initializer.body {
                                     let val = self.exec_stmt(stmt)?;
-                                    if val.is_some() {
-                                        break;
+                                    if let Some(v) = val && !matches!(v, Value::Nil) {
+                                        return Err(RuntimeError::InvalidInitializerReturn)
                                     }
                                 }
 
