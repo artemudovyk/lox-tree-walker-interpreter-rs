@@ -931,3 +931,21 @@ dog.identify(); // expect: Cat
         .success()
         .stdout(predicate::str::contains("Woof\nCat"));
 }
+
+#[test]
+fn does_not_allow_invalid_usage_of_this_keyword() {
+    let src = r#"
+print this;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "Can't use 'this' outside of a class.",
+        ));
+}

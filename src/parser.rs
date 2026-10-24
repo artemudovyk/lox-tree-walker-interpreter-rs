@@ -22,6 +22,8 @@ pub enum ParseError {
     TooManyArguments,
     #[error("Missing comma between parameters in function declaration.")]
     MissingCommaBetweenParameters,
+    #[error("Can't use 'this' outside of a class.")]
+    InvalidThisUsage,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -648,14 +650,18 @@ impl<'src> Parser<'src> {
             if let Ok(atom) = Atom::try_from(&token) {
                 Expr::Atom(atom)
             } else if matches!(token.kind, TokenKind::Keyword(Keyword::This)) {
-                Expr::Atom(Atom::Ident {
-                    name: "this",
-                    loc: Loc {
-                        line: self.current_line(),
-                        // TODO: placeholder
-                        col: 0,
-                    },
-                })
+                if self.in_class {
+                    Expr::Atom(Atom::Ident {
+                        name: "this",
+                        loc: Loc {
+                            line: self.current_line(),
+                            // TODO: placeholder
+                            col: 0,
+                        },
+                    })
+                } else {
+                    return Err(ParseError::InvalidThisUsage);
+                }
             } else if token.unterminated() {
                 return Err(ParseError::UnterminatedString {
                     line: token.line,
