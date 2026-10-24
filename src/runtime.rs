@@ -34,6 +34,8 @@ pub enum RuntimeError {
     },
     #[error("Can't return a value from an initializer.")]
     InvalidInitializerReturn,
+    #[error("'{0} not a class.")]
+    NotAClass(String),
 }
 
 pub struct Runtime<'src, W: Write> {
@@ -356,7 +358,33 @@ impl<'src, W: Write> Runtime<'src, W> {
                         }
                         Value::Class(Class { ident, superclass, methods }) => {
                             let mut initializer = None;
-                            let funcs = methods.iter().filter_map(|stmt| match stmt {
+                            let mut funcs = vec![];
+
+                            let mut current_superclass = superclass;
+                            while let Some(sc_name) = current_superclass {
+                                let Some(Value::Class(superclass)) = self.env.borrow().get(sc_name) else {
+                                    return Err(RuntimeError::NotAClass(sc_name.to_string()));
+                                };
+
+                                let sc_methods = superclass.methods.iter().filter_map(|stmt| match stmt {
+                                    Stmt::FunDecl { ident, parameters, body } => {
+                                        let func = Func {
+                                            ident,
+                                            body: body.clone(),
+                                            parameters: parameters.clone(),
+                                            closure: self.env.clone(),
+                                            is_initializer: *ident == "init",
+                                        };
+                                        Some((*ident, Value::Func(func)))
+                                    }
+                                    _ => None,
+                                }).collect::<Vec<(&'src str, Value<'src>)>>();
+
+                                funcs.extend(sc_methods);
+                                current_superclass = superclass.superclass;
+                            }
+
+                            funcs.extend(methods.iter().filter_map(|stmt| match stmt {
                                 Stmt::FunDecl { ident, parameters, body } => {
                                     let func = Func {
                                         ident,
@@ -371,8 +399,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                     Some((*ident, Value::Func(func)))
                                 }
                                 _ => None,
-                            }).collect::<Vec<(&'src str, Value<'src>)>>();
-
+                            }).collect::<Vec<(&'src str, Value<'src>)>>());
 
                             let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
                                 class_ident: ident,

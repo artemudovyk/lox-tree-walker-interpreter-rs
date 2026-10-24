@@ -1111,3 +1111,85 @@ fn inheritance_does_not_change_class_output_ident() {
             "A instance\nB instance\nC instance",
         ));
 }
+
+#[test]
+fn subclass_inherits_superclass_methods() {
+    let src = r#"
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+}
+
+// BostonCream is a subclass of Doughnut
+class BostonCream < Doughnut {}
+
+// BostonCream class should inherit the cook
+// method from Doughnut class
+BostonCream().cook();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Fry until golden brown."));
+}
+
+#[test]
+fn subclass_inherits_superclass_methods_multilevel_inheritance() {
+    let src = r#"
+class Root {
+  getName() {
+    print "Root class";
+  }
+}
+
+class Parent < Root {
+  parentMethod() {
+    print "Method defined in Parent";
+  }
+}
+
+class Child < Parent {
+  childMethod() {
+    print "Method defined in Child";
+  }
+}
+
+var root = Root();
+var parent = Parent();
+var child = Child();
+
+// Root methods are available to all
+root.getName();
+parent.getName();
+child.getName();
+
+// Parent methods are available to Parent and Child
+parent.parentMethod();
+child.parentMethod();
+
+// Child methods are only available to Child
+child.childMethod();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Root class
+Root class
+Root class
+Method defined in Parent
+Method defined in Parent
+Method defined in Child",
+        ));
+}
