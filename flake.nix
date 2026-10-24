@@ -31,6 +31,7 @@
             rust-bin.stable.latest.default
             pkg-config
             cargo-nextest
+            vscode-extensions.vadimcn.vscode-lldb.adapter
           ];
           depsBuildBuild = [ ];
           buildInputs = [ ];
