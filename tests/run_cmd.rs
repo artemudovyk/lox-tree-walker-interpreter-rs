@@ -1053,3 +1053,31 @@ Person();
         .assert()
         .success();
 }
+
+#[test]
+fn instance_return_from_class_initializer_not_allowed() {
+    let src = r#"
+class ThingDefault {
+  init() {
+    this.x = "foo";
+    this.y = 42;
+    // constructor should not return the instance
+    return this; // expect compile error
+  }
+}
+var out = ThingDefault();
+print out;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Can't return a value from an initializer.",
+        ));
+}

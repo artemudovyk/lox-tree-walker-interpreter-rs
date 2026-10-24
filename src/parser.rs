@@ -24,6 +24,8 @@ pub enum ParseError {
     MissingCommaBetweenParameters,
     #[error("Can't use 'this' outside of a class.")]
     InvalidThisUsage,
+    #[error("Can't return a value from an initializer.")]
+    InvalidInitializerReturn,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -454,6 +456,16 @@ impl<'src> Parser<'src> {
         self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
         self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
         let body = self.parse_block()?;
+        if self.in_class
+            && self.cur_func.is_some_and(|f| f == "init")
+            && body.iter().any(|stmt| match stmt {
+                Stmt::Return(Some(Expr::Atom(Atom::Nil))) => false,
+                Stmt::Return(Some(_)) => true,
+                _ => false,
+            })
+        {
+            return Err(ParseError::InvalidInitializerReturn);
+        }
         self.cur_func = prev_func;
         Ok(Stmt::FunDecl {
             ident,
