@@ -302,7 +302,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                             }
                             _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                         }
-                        
                     }
                     _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                 }
@@ -355,11 +354,11 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                             Ok(val.unwrap_or(Value::Nil))
                         }
-                        Value::Class(Class { ident, methods }) => {
+                        Value::Class(Class { ident, superclass, methods }) => {
                             let mut initializer = None;
                             let funcs = methods.iter().filter_map(|stmt| match stmt {
                                 Stmt::FunDecl { ident, parameters, body } => {
-                                    let func = Func { 
+                                    let func = Func {
                                         ident,
                                         body: body.clone(),
                                         parameters: parameters.clone(),
@@ -397,7 +396,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         return Err(RuntimeError::InvalidInitializerReturn)
                                     }
                                 }
-
                                 self.env = prev_env;
                             }
 
@@ -520,8 +518,16 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Some(expr) => self.eval_expr(&expr).map(Option::from),
                 None => Ok(Some(Value::Nil)),
             },
-            Stmt::ClassDecl { ident, methods } => {
-                let class = Value::Class(Class { ident, methods });
+            Stmt::ClassDecl {
+                ident,
+                superclass,
+                methods,
+            } => {
+                let class = Value::Class(Class {
+                    ident,
+                    superclass,
+                    methods,
+                });
                 self.env.borrow_mut().set(ident, class);
                 Ok(None)
             }
@@ -550,7 +556,10 @@ impl<'src, W: Write> Runtime<'src, W> {
     }
 
     pub fn current_line(&self) -> usize {
-        std::cmp::max(self.parser.current_line() - 1, self.resolver.current_line() - 1)
+        std::cmp::max(
+            self.parser.current_line() - 1,
+            self.resolver.current_line() - 1,
+        )
     }
 }
 
@@ -593,7 +602,9 @@ impl<'src> std::fmt::Display for Value<'src> {
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
             Self::Class(cls) => write!(f, "{}", cls.ident),
-            Self::ClassInstance(instance) => write!(f, "{} instance", instance.borrow().class_ident),
+            Self::ClassInstance(instance) => {
+                write!(f, "{} instance", instance.borrow().class_ident)
+            }
         }
     }
 }
@@ -623,6 +634,7 @@ impl std::fmt::Display for NativeFunc {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Class<'src> {
     pub ident: &'src str,
+    pub superclass: Option<&'src str>,
     pub methods: Vec<Stmt<'src>>,
 }
 

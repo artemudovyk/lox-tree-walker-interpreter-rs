@@ -1081,3 +1081,33 @@ print out;
             "Can't return a value from an initializer.",
         ));
 }
+
+#[test]
+fn inheritance_does_not_change_class_output_ident() {
+    let src = r#"
+{
+  class A {}
+
+  // B is a subclass of A
+  class B < A {}
+
+  // C is also a subclass of A
+  class C < A {}
+
+  print A();
+  print B();
+  print C();
+}
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "A instance\nB instance\nC instance",
+        ));
+}

@@ -26,6 +26,8 @@ pub enum ParseError {
     InvalidThisUsage,
     #[error("Can't return a value from an initializer.")]
     InvalidInitializerReturn,
+    #[error("A class can't inherit from itself.")]
+    InheritFromItselfNotAllowed,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -60,6 +62,7 @@ pub enum Stmt<'src> {
     },
     ClassDecl {
         ident: &'src str,
+        superclass: Option<&'src str>,
         methods: Vec<Stmt<'src>>,
     },
 }
@@ -132,10 +135,17 @@ impl<'src> std::fmt::Display for Stmt<'src> {
                     write!(f, "(return)")
                 }
             }
-            Self::ClassDecl { ident, methods } => {
+            Self::ClassDecl {
+                ident,
+                methods,
+                superclass,
+            } => {
                 write!(f, "(class {ident}")?;
+                if let Some(sc) = superclass {
+                    write!(f, " {sc}")?
+                }
                 for method in methods {
-                    write!(f, " {}", method)?;
+                    write!(f, " {method}")?;
                 }
                 write!(f, ")")
             }
@@ -613,10 +623,34 @@ impl<'src> Parser<'src> {
                     let ident = self
                         .expect_token(TokenKind::Ident, "Expect class name identifier.")?
                         .lexeme;
+
+                    let superclass = match self.lexer.peek().kind {
+                        TokenKind::Less => {
+                            self.lexer.advance();
+                            let sc_name = self
+                                .expect_token(
+                                    TokenKind::Ident,
+                                    "Expect superclass name identifier.",
+                                )?
+                                .lexeme;
+
+                            if ident == sc_name {
+                                return Err(ParseError::InheritFromItselfNotAllowed);
+                            }
+
+                            Some(sc_name)
+                        }
+                        _ => None,
+                    };
+
                     self.expect_token(TokenKind::LeftBrace, "Expect a '{' after the class name.")?;
                     let methods = self.parse_block()?;
                     self.in_class = false;
-                    return Ok(Some(Stmt::ClassDecl { ident, methods }));
+                    return Ok(Some(Stmt::ClassDecl {
+                        ident,
+                        methods,
+                        superclass,
+                    }));
                 }
                 TokenKind::Keyword(Keyword::Return) => {
                     self.lexer.advance();
@@ -1451,5 +1485,17 @@ class Superhero {
             format!("{stmt}"),
             "(class Superhero (fun giveSpecialPower hero power (block (print hero) (print power) (= (dot hero specialPower) power))))"
         );
+    }
+
+    #[test]
+    fn superclass() {
+        let src = r##"
+class Car < Vehicle {
+    fun drive() {}
+}
+"##;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(format!("{stmt}"), "(class Car Vehicle (fun drive (block)))");
     }
 }
