@@ -288,7 +288,11 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 let p = instance.borrow().get(property)?;
                                 if let Value::Func(mut func) = p {
                                     let mut env = func.closure.borrow().clone();
-                                    env.set("this", Value::ClassInstance(instance));
+                                    // Do not overwrite `this` in case of class method reassigned
+                                    // with method from another class
+                                    if env.get("this").is_none() {
+                                        env.set("this", Value::ClassInstance(instance));
+                                    }
                                     func.closure = Rc::new(RefCell::new(env));
                                     return Ok(Value::Func(func))
                                 }

@@ -891,3 +891,43 @@ method();
         .success()
         .stdout(predicate::str::contains("Egotist"));
 }
+
+#[test]
+fn this_keyword_should_be_bound_to_class_instance_the_method_is_called_on() {
+    let src = r#"
+class Animal {
+  makeSound() {
+    print this.sound;
+  }
+
+  identify() {
+    print this.species;
+  }
+}
+
+var dog = Animal();
+dog.sound = "Woof";
+dog.species = "Dog";
+
+var cat = Animal();
+cat.sound = "Meow";
+cat.species = "Cat";
+
+// The this keyword should be bound to the
+// class instance that the method is called on
+cat.makeSound = dog.makeSound;
+dog.identify = cat.identify;
+
+cat.makeSound(); // expect: Woof
+dog.identify(); // expect: Cat
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Woof\nCat"));
+}
