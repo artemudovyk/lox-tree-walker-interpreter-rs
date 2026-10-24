@@ -95,7 +95,7 @@ impl<'src, W: Write> Runtime<'src, W> {
             },
             Expr::Cons(op, args) => match op {
                 Op::Add => match args.as_slice() {
-                    [left, right] => match (self.eval_expr(left)?, self.eval_expr(right)?) {
+                    [left, right] => match (dbg!(self.eval_expr(left)?), dbg!(self.eval_expr(right)?)) {
                         (Value::Number(l), Value::Number(r)) => Ok(Value::Number(l + r)),
                         (Value::String(l), Value::String(r)) => {
                             Ok(Value::String(Cow::Owned(format!("{l}{r}"))))
@@ -284,7 +284,16 @@ impl<'src, W: Write> Runtime<'src, W> {
                 Op::Dot => match args.as_slice() {
                     [obj, Expr::Atom(Atom::Ident { name: property, .. })] => {
                         match self.eval_expr(obj)? {
-                            Value::ClassInstance(instance) => instance.borrow().get(property),
+                            Value::ClassInstance(instance) => {
+                                let p = instance.borrow().get(property)?;
+                                if let Value::Func(mut func) = p {
+                                    let mut env = func.closure.borrow().clone();
+                                    env.set("this", Value::ClassInstance(instance));
+                                    func.closure = Rc::new(RefCell::new(env));
+                                    return Ok(Value::Func(func))
+                                }
+                                Ok(p)
+                            }
                             _ => Err(RuntimeError::TypeMismatch("Unsupported operands number for this operation.".to_owned()))?
                         }
                         

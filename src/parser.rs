@@ -647,6 +647,15 @@ impl<'src> Parser<'src> {
             let token = self.lexer.next_token();
             if let Ok(atom) = Atom::try_from(&token) {
                 Expr::Atom(atom)
+            } else if matches!(token.kind, TokenKind::Keyword(Keyword::This)) {
+                Expr::Atom(Atom::Ident {
+                    name: "this",
+                    loc: Loc {
+                        line: self.current_line(),
+                        // TODO: placeholder
+                        col: 0,
+                    },
+                })
             } else if token.unterminated() {
                 return Err(ParseError::UnterminatedString {
                     line: token.line,

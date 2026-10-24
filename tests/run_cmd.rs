@@ -842,3 +842,52 @@ performHeroics(superman, heroClass);
         .success()
         .stdout(predicate::str::contains("Using power: Strength"));
 }
+
+#[test]
+fn supports_this_keyword_in_class_methods() {
+    let src = r#"
+class Cake {
+  taste() {
+    var adjective = "delicious";
+    print "The " + this.flavor + " cake is " + adjective + "!";
+  }
+}
+
+var cake = Cake();
+cake.flavor = "German chocolate";
+cake.taste(); // Prints "The German chocolate cake is delicious!"."#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "The German chocolate cake is delicious!",
+        ));
+}
+
+#[test]
+fn this_keyword_in_method_uses_object_it_was_accessed_from_not_invoked_from() {
+    let src = r#"
+class Egotist {
+  speak() {
+    print this;
+  }
+}
+
+var method = Egotist().speak;
+method();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Egotist"));
+}
