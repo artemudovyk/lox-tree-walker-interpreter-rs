@@ -972,3 +972,38 @@ print Default().y;
         .success()
         .stdout(predicate::str::contains("bar\n91"));
 }
+
+#[test]
+fn constructor_can_be_used_on_instance_itself() {
+    let src = r#"
+class Counter {
+  init(startValue) {
+    if (startValue < 0) {
+      print "startValue can't be negative";
+      this.count = 0;
+    } else {
+      this.count = startValue;
+    }
+  }
+}
+
+// constructor is called automatically here
+var instance = Counter(-51);
+print instance.count;
+
+// it should be possible to call the constructor
+// on a class instance as well
+print instance.init(51).count;
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "startValue can't be negative\n0\n51",
+        ));
+}

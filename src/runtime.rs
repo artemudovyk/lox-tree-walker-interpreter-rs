@@ -341,6 +341,11 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 }
                             }
 
+                            // If initializer, return an instance itself it `init` called directly.
+                            if func.is_initializer {
+                                val = self.env.borrow().get("this");
+                            }
+
                             self.env = prev_env;
 
                             Ok(val.unwrap_or(Value::Nil))
@@ -354,6 +359,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                         body: body.clone(),
                                         parameters: parameters.clone(),
                                         closure: self.env.clone(),
+                                        is_initializer: *ident == "init",
                                     };
                                     if *ident == "init" {
                                         initializer = Some(func.clone())
@@ -500,6 +506,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                     body,
                     // Capture current environment
                     closure: self.env.clone(),
+                    is_initializer: false,
                 });
                 self.env.borrow_mut().set(ident, func);
                 Ok(None)
@@ -592,6 +599,7 @@ pub struct Func<'src> {
     pub parameters: Vec<&'src str>,
     pub body: Vec<Stmt<'src>>,
     pub closure: Rc<RefCell<Env<'src>>>,
+    is_initializer: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
