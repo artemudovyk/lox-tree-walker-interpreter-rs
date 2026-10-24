@@ -789,3 +789,56 @@ Robot().beep();
         .success()
         .stdout(predicate::str::contains("Beep boop!\nBeep boop!"));
 }
+
+#[test]
+fn can_accept_class_instance_as_parameter_to_method() {
+    let src = r#"
+class Superhero {
+  // Methods should be able to accept a parameter
+  useSpecialPower(hero) {
+    print "Using power: " + hero.specialPower;
+  }
+
+  // Methods should be able to accept a parameter
+  // of any type
+  hasSpecialPower(hero) {
+    return hero.specialPower;
+  }
+
+  // Methods should be able to accept class
+  // instances as parameters and then update their
+  // properties
+  giveSpecialPower(hero, power) {
+    hero.specialPower = power;
+  }
+}
+
+fun performHeroics(hero, superheroClass) {
+  if (superheroClass.hasSpecialPower(hero)) {
+    superheroClass.useSpecialPower(hero);
+  } else {
+    print "No special power available";
+  }
+}
+
+var superman = Superhero();
+var heroClass = Superhero();
+
+if (false) {
+  heroClass.giveSpecialPower(superman, "Flight");
+} else {
+  heroClass.giveSpecialPower(superman, "Strength");
+}
+
+performHeroics(superman, heroClass);
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Using power: Strength"));
+}

@@ -358,6 +358,7 @@ pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
     in_class: bool,
+    cur_func: Option<&'src str>,
 }
 
 #[allow(dead_code)]
@@ -367,6 +368,7 @@ impl<'src> Parser<'src> {
             src,
             lexer: Lexer::new(src),
             in_class: false,
+            cur_func: None,
         }
     }
 
@@ -385,8 +387,9 @@ impl<'src> Parser<'src> {
         let token = self.lexer.next_token();
         if token.kind != token_kind {
             return Err(ParseError::ExpectedTokenNotFound(format!(
-                "[line {}] Error at '{}': {}",
-                token.line, token.lexeme, msg
+                // "[line {}] Error at '{}': {}",
+                "Error at '{}': {}",
+                token.lexeme, msg
             )));
         }
         Ok(token)
@@ -412,7 +415,9 @@ impl<'src> Parser<'src> {
                 }
                 // Treat all identifiers in the block as function declarations if we are inside the
                 // class declaration.
-                TokenKind::Ident if self.in_class => statements.push(self.parse_function()?),
+                TokenKind::Ident if self.in_class && self.cur_func.is_none() => {
+                    statements.push(self.parse_function()?)
+                }
                 _ => statements.push(
                     self.next_stmt()?
                         .expect("Statement is expected at this point"),
@@ -426,6 +431,9 @@ impl<'src> Parser<'src> {
         let ident = self
             .expect_token(TokenKind::Ident, "Expect identifier.")?
             .lexeme;
+        let prev_func = self.cur_func;
+        self.cur_func = Some(ident);
+        // TODO: why it fails in my last test?
         self.expect_token(TokenKind::LeftParen, "Expect a '('.")?;
         let mut params = vec![];
         while !matches!(self.lexer.peek().kind, TokenKind::RightParen) {
@@ -444,6 +452,7 @@ impl<'src> Parser<'src> {
         self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
         self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
         let body = self.parse_block()?;
+        self.cur_func = prev_func;
         Ok(Stmt::FunDecl {
             ident,
             parameters: params,
@@ -1396,5 +1405,24 @@ mod tests {
         let mut parser = Parser::new(src);
         let stmt = parser.next_stmt().unwrap().unwrap();
         assert_eq!(format!("{stmt}"), "(call (dot x method))");
+    }
+
+    #[test]
+    fn class_method() {
+        let src = r##"
+class Superhero {
+  giveSpecialPower(hero, power) {
+    print hero;
+    print power;
+    hero.specialPower = power;
+  }
+}
+"##;
+        let mut parser = Parser::new(src);
+        let stmt = parser.next_stmt().unwrap().unwrap();
+        assert_eq!(
+            format!("{stmt}"),
+            "(class Superhero (fun giveSpecialPower hero power (block (print hero) (print power) (= (dot hero specialPower) power))))"
+        );
     }
 }

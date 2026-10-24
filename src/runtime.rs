@@ -498,7 +498,7 @@ impl<'src, W: Write> Runtime<'src, W> {
     }
 
     pub fn current_line(&self) -> usize {
-        std::cmp::max(self.parser.current_line(), self.resolver.current_line())
+        std::cmp::max(self.parser.current_line() - 1, self.resolver.current_line() - 1)
     }
 }
 
