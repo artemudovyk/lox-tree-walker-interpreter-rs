@@ -1350,5 +1350,6 @@ print B();
         .arg(file.path())
         .assert()
         .failure()
+        .stdout(predicate::str::is_empty())
         .stderr(predicate::str::contains("Superclass must be a class."));
 }

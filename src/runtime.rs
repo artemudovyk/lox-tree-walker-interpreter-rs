@@ -564,6 +564,12 @@ impl<'src, W: Write> Runtime<'src, W> {
                     superclass,
                     methods,
                 });
+                if let Some(sc_name) = superclass
+                    && let Some(sc) = self.env.borrow().get(sc_name)
+                    && !matches!(sc, Value::Class(_))
+                {
+                    return Err(RuntimeError::NotAClass(sc_name.to_string()));
+                }
                 self.env.borrow_mut().set(ident, class);
                 Ok(None)
             }
