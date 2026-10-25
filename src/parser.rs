@@ -28,6 +28,10 @@ pub enum ParseError {
     InvalidInitializerReturn,
     #[error("A class can't inherit from itself.")]
     InheritFromItselfNotAllowed,
+    #[error("Can't use 'super' in a class with no superclass.")]
+    SuperInClassWithNoSuperclassNotAllowed,
+    #[error("Can't use 'super' outside of a class.")]
+    SuperOutsideClassNotAllowed,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -367,11 +371,26 @@ impl<'src> TryFrom<Token<'src>> for Op {
     }
 }
 
+enum CurrentClass<'src> {
+    Class(&'src str),
+    Subclass(&'src str),
+    None,
+}
+
+impl<'src> CurrentClass<'src> {
+    fn in_scope(&self) -> bool {
+        match self {
+            Self::Class(_) | Self::Subclass(_) => true,
+            Self::None => false,
+        }
+    }
+}
+
 #[allow(dead_code)]
 pub struct Parser<'src> {
     src: &'src str,
     lexer: Lexer<'src>,
-    in_class: bool,
+    in_class: CurrentClass<'src>,
     cur_func: Option<&'src str>,
 }
 
@@ -381,7 +400,7 @@ impl<'src> Parser<'src> {
         Self {
             src,
             lexer: Lexer::new(src),
-            in_class: false,
+            in_class: CurrentClass::None,
             cur_func: None,
         }
     }
@@ -429,7 +448,7 @@ impl<'src> Parser<'src> {
                 }
                 // Treat all identifiers in the block as function declarations if we are inside the
                 // class declaration.
-                TokenKind::Ident if self.in_class && self.cur_func.is_none() => {
+                TokenKind::Ident if self.in_class.in_scope() && self.cur_func.is_none() => {
                     statements.push(self.parse_function()?)
                 }
                 _ => statements.push(
@@ -466,7 +485,7 @@ impl<'src> Parser<'src> {
         self.expect_token(TokenKind::RightParen, "Expect ')'.")?;
         self.expect_token(TokenKind::LeftBrace, "Expect '{'.")?;
         let body = self.parse_block()?;
-        if self.in_class
+        if self.in_class.in_scope()
             && self.cur_func.is_some_and(|f| f == "init")
             && body.iter().any(|stmt| match stmt {
                 Stmt::Return(Some(Expr::Atom(Atom::Nil))) => false,
@@ -619,10 +638,10 @@ impl<'src> Parser<'src> {
                 }
                 TokenKind::Keyword(Keyword::Class) => {
                     self.lexer.advance(); // step over `class` keyword
-                    self.in_class = true;
                     let ident = self
                         .expect_token(TokenKind::Ident, "Expect class name identifier.")?
                         .lexeme;
+                    self.in_class = CurrentClass::Class(ident);
 
                     let superclass = match self.lexer.peek().kind {
                         TokenKind::Less => {
@@ -638,6 +657,8 @@ impl<'src> Parser<'src> {
                                 return Err(ParseError::InheritFromItselfNotAllowed);
                             }
 
+                            self.in_class = CurrentClass::Subclass(ident);
+
                             Some(sc_name)
                         }
                         _ => None,
@@ -645,7 +666,7 @@ impl<'src> Parser<'src> {
 
                     self.expect_token(TokenKind::LeftBrace, "Expect a '{' after the class name.")?;
                     let methods = self.parse_block()?;
-                    self.in_class = false;
+                    self.in_class = CurrentClass::None;
                     return Ok(Some(Stmt::ClassDecl {
                         ident,
                         methods,
@@ -696,7 +717,7 @@ impl<'src> Parser<'src> {
             if let Ok(atom) = Atom::try_from(&token) {
                 Expr::Atom(atom)
             } else if matches!(token.kind, TokenKind::Keyword(Keyword::This)) {
-                if self.in_class {
+                if self.in_class.in_scope() {
                     Expr::Atom(Atom::Ident {
                         name: "this",
                         loc: Loc {
@@ -709,17 +730,21 @@ impl<'src> Parser<'src> {
                     return Err(ParseError::InvalidThisUsage);
                 }
             } else if matches!(token.kind, TokenKind::Keyword(Keyword::Super)) {
-                if self.in_class {
-                    Expr::Atom(Atom::Ident {
-                        name: "super",
-                        loc: Loc {
-                            line: self.current_line(),
-                            // TODO: placeholder
-                            col: 0,
-                        },
-                    })
-                } else {
-                    return Err(ParseError::InvalidThisUsage);
+                match self.in_class {
+                    CurrentClass::Subclass(_) => {
+                        Expr::Atom(Atom::Ident {
+                            name: "super",
+                            loc: Loc {
+                                line: self.current_line(),
+                                // TODO: placeholder
+                                col: 0,
+                            },
+                        })
+                    }
+                    CurrentClass::Class(_) => {
+                        return Err(ParseError::SuperInClassWithNoSuperclassNotAllowed);
+                    }
+                    CurrentClass::None => return Err(ParseError::SuperOutsideClassNotAllowed),
                 }
             } else if token.unterminated() {
                 return Err(ParseError::UnterminatedString {

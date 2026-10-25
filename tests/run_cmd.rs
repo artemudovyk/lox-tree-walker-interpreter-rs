@@ -1447,3 +1447,47 @@ fn should_be_able_to_return_the_class_itself() {
         .success()
         .stdout(predicate::str::contains("Foo"));
 }
+
+#[test]
+fn super_keyword_in_class_with_no_superclass_returns_compile_error() {
+    let src = r#"
+class Foo {
+  cook() {
+    // Foo is not a subclass
+    super.cook(); // expect compile error
+  }
+}
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Can't use 'super' in a class with no superclass.",
+        ));
+}
+
+#[test]
+fn super_outside_of_class_returns_compile_error() {
+    let src = r#"
+// super can't be used outside of a class
+super.notEvenInAClass(); // expect compile error
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "Can't use 'super' outside of a class.",
+        ));
+}
