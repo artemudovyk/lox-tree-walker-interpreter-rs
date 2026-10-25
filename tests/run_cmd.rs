@@ -1311,3 +1311,44 @@ Dog speaks : Woof
 Puppy speaks : Woof",
         ));
 }
+
+#[test]
+fn inherit_from_itself_not_allowed() {
+    let src = r#"
+// A class can't inherit from itself.
+class Foo < Foo {} // expect compile error
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains(
+            "A class can't inherit from itself.",
+        ));
+}
+
+#[test]
+fn superclass_must_be_a_class() {
+    let src = r#"
+fun A() {}
+
+// A class can only inherit from a class.
+class B < A {} // expect runtime error
+
+print A();
+print B();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("Superclass must be a class."));
+}

@@ -34,7 +34,7 @@ pub enum RuntimeError {
     },
     #[error("Can't return a value from an initializer.")]
     InvalidInitializerReturn,
-    #[error("'{0} not a class.")]
+    #[error("Superclass must be a class.")]
     NotAClass(String),
 }
 
