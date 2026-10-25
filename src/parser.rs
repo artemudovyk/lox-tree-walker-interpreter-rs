@@ -32,6 +32,8 @@ pub enum ParseError {
     SuperInClassWithNoSuperclassNotAllowed,
     #[error("Can't use 'super' outside of a class.")]
     SuperOutsideClassNotAllowed,
+    #[error("'super' must be followed by get expression.")]
+    SuperMustBeFollowedByGetExpression,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -732,14 +734,17 @@ impl<'src> Parser<'src> {
             } else if matches!(token.kind, TokenKind::Keyword(Keyword::Super)) {
                 match self.in_class {
                     CurrentClass::Subclass(_) => {
-                        Expr::Atom(Atom::Ident {
-                            name: "super",
-                            loc: Loc {
-                                line: self.current_line(),
-                                // TODO: placeholder
-                                col: 0,
-                            },
-                        })
+                        match self.lexer.peek().kind {
+                            TokenKind::Dot => Expr::Atom(Atom::Ident {
+                                name: "super",
+                                loc: Loc {
+                                    line: self.current_line(),
+                                    // TODO: placeholder
+                                    col: 0,
+                                },
+                            }),
+                            _ => return Err(ParseError::SuperMustBeFollowedByGetExpression),
+                        }
                     }
                     CurrentClass::Class(_) => {
                         return Err(ParseError::SuperInClassWithNoSuperclassNotAllowed);

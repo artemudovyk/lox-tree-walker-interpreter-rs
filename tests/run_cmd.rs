@@ -1491,3 +1491,32 @@ super.notEvenInAClass(); // expect compile error
             "Can't use 'super' outside of a class.",
         ));
 }
+
+#[test]
+fn super_must_follow_by_get_expression() {
+    let src = r#"
+class A {
+  method() {}
+}
+
+class B < A {
+  method() {
+    // super must be followed by `.`
+    // and an expression
+    (super).method(); // expect compile error
+  }
+}
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .failure()
+        .code(65)
+        .stderr(predicate::str::contains(
+            "'super' must be followed by get expression.",
+        ));
+}
