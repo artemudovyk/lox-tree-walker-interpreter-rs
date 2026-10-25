@@ -1421,3 +1421,29 @@ child.method();
         .success()
         .stdout(predicate::str::contains("Base.method()\nBase.method()"));
 }
+
+#[test]
+fn should_be_able_to_return_the_class_itself() {
+    let src = r#"
+{
+  class Foo {
+    returnSelf() {
+      // Should be able to return the class itself
+      return Foo;
+    }
+  }
+
+  // Calling a method on an instance should work
+  print Foo().returnSelf();
+}
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Foo"));
+}

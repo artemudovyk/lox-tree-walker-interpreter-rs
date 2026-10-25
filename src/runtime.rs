@@ -304,6 +304,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                             }
                             // `super` get expression
                             Value::Class(class) if matches!(obj, Expr::Atom(Atom::Ident { name: "super", .. })) => {
+                                let class = class.borrow();
                                 let Some(method) = class.resolved_methods.get(property) else {
                                     return Err(RuntimeError::UndefinedProperty(property.to_string()))
                                 };
@@ -363,14 +364,15 @@ impl<'src, W: Write> Runtime<'src, W> {
 
                             Ok(val.unwrap_or(Value::Nil))
                         }
-                        Value::Class(Class { ident, superclass, resolved_methods, .. }) => {
+                        Value::Class(class) => {
                             // TODO: replace this VecDeque later. Do not want to reorganize logic at
                             // the moment to push initializers in the proper order.
                             let mut initializers = VecDeque::new();
                             let mut funcs: HashMap<&'src str, Value<'src>> = HashMap::new();
+                            let class = class.borrow();
 
                             // Class methods
-                            for (ident, func) in resolved_methods {
+                            for (ident, func) in &class.resolved_methods {
                                 // if let Stmt::FunDecl { ident, parameters, body } = stmt {
                                 //     let mut env = self.env.borrow().clone();
                                 //     if let Some(sc_name) = superclass && let Some(sc) = env.get(sc_name) {
@@ -389,20 +391,21 @@ impl<'src, W: Write> Runtime<'src, W> {
                                 //     funcs.entry(ident).or_insert(Value::Func(func));
                                 // }
                                 
-                                if let Value::Func(ref func @ Func { is_initializer: true, .. }) = func {
+                                if let Value::Func(func @ Func { is_initializer: true, .. }) = func {
                                     initializers.push_back(func.clone())
                                 }
-                                funcs.entry(ident).or_insert(func);
+                                funcs.entry(ident).or_insert(func.clone());
                             }
 
                             // Superclass methods
-                            let mut current_superclass = superclass;
+                            let mut current_superclass = class.superclass;
                             while let Some(sc_name) = current_superclass {
                                 let Some(Value::Class(superclass)) = self.env.borrow().get(sc_name) else {
                                     return Err(RuntimeError::NotAClass(sc_name.to_string()));
                                 };
 
-                                for stmt in superclass.methods {
+                                let superclass = superclass.borrow();
+                                for stmt in &superclass.methods {
                                     if let Stmt::FunDecl { ident, parameters, body } = stmt {
                                         let mut env = self.env.borrow().clone();
                                         if let Some(super_super_name) = superclass.superclass && let Some(ssc) = env.get(super_super_name) {
@@ -415,7 +418,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                                             closure: Rc::new(RefCell::new(env)),
                                             is_initializer: superclass.ident == "init",
                                         };
-                                        if ident == "init" {
+                                        if *ident == "init" {
                                             initializers.push_back(func.clone())
                                         }
                                         funcs.entry(ident).or_insert(Value::Func(func));
@@ -427,7 +430,7 @@ impl<'src, W: Write> Runtime<'src, W> {
 
 
                             let instance = Value::ClassInstance(Rc::new(RefCell::new(ClassInstance {
-                                class_ident: ident,
+                                class_ident: class.ident,
                                 fields: funcs,
                             })));
 
@@ -579,7 +582,22 @@ impl<'src, W: Write> Runtime<'src, W> {
                 superclass,
                 methods,
             } => {
-                let resolved_methods: HashMap<&'src str, Value<'src>> = HashMap::from_iter(methods.iter().filter_map(|stmt| match stmt {
+                // Add class name in the environment early to allow to reference it inside its
+                // own methods. Example:
+                // class Foo {
+                //   fun returnSelf() { 
+                //     return Foo;
+                //   }
+                // }
+                let class = Rc::new(RefCell::new(Class { 
+                    ident,
+                    superclass,
+                    methods,
+                    resolved_methods: HashMap::new(),
+                }));
+                self.env.borrow_mut().set(ident, Value::Class(class.clone()));
+
+                let resolved_methods: HashMap<&'src str, Value<'src>> = HashMap::from_iter(class.borrow().methods.iter().filter_map(|stmt| match stmt {
                     Stmt::FunDecl { ident, parameters, body } => {
                         let mut env = self.env.borrow().clone();
                         if let Some(sc_name) = superclass && let Some(sc) = env.get(sc_name) {
@@ -597,12 +615,7 @@ impl<'src, W: Write> Runtime<'src, W> {
                     _ => None,
                 }).collect::<Vec<(&'src str, Value<'src>)>>());
 
-                let class = Value::Class(Class {
-                    ident,
-                    superclass,
-                    methods,
-                    resolved_methods,
-                });
+                class.borrow_mut().resolved_methods = resolved_methods;
 
                 if let Some(sc_name) = superclass
                     && let Some(sc) = self.env.borrow().get(sc_name)
@@ -610,8 +623,6 @@ impl<'src, W: Write> Runtime<'src, W> {
                 {
                     return Err(RuntimeError::NotAClass(sc_name.to_string()));
                 }
-
-                self.env.borrow_mut().set(ident, class);
 
                 Ok(None)
             }
@@ -661,7 +672,7 @@ pub enum Value<'src> {
     Nil,
     Func(Func<'src>),
     NativeFunc(NativeFunc),
-    Class(Class<'src>),
+    Class(Rc<RefCell<Class<'src>>>),
     ClassInstance(Rc<RefCell<ClassInstance<'src>>>),
 }
 
@@ -685,7 +696,7 @@ impl<'src> std::fmt::Display for Value<'src> {
             // Self::Func(func) => write!(f, "{}({})", func.ident, func.parameters.join(", ")),
             Self::Func(func) => write!(f, "<fn {}>", func.ident),
             Self::NativeFunc(func) => write!(f, "<fn {}>", func),
-            Self::Class(cls) => write!(f, "{}", cls.ident),
+            Self::Class(cls) => write!(f, "{}", cls.borrow().ident),
             Self::ClassInstance(instance) => {
                 write!(f, "{} instance", instance.borrow().class_ident)
             }
