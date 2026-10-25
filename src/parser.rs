@@ -708,6 +708,19 @@ impl<'src> Parser<'src> {
                 } else {
                     return Err(ParseError::InvalidThisUsage);
                 }
+            } else if matches!(token.kind, TokenKind::Keyword(Keyword::Super)) {
+                if self.in_class {
+                    Expr::Atom(Atom::Ident {
+                        name: "super",
+                        loc: Loc {
+                            line: self.current_line(),
+                            // TODO: placeholder
+                            col: 0,
+                        },
+                    })
+                } else {
+                    return Err(ParseError::InvalidThisUsage);
+                }
             } else if token.unterminated() {
                 return Err(ParseError::UnterminatedString {
                     line: token.line,

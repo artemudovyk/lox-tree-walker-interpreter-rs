@@ -1353,3 +1353,71 @@ print B();
         .stdout(predicate::str::is_empty())
         .stderr(predicate::str::contains("Superclass must be a class."));
 }
+
+#[test]
+fn super_can_be_used_to_call_overriden_method() {
+    let src = r#"
+class Doughnut {
+  cook() {
+    print "Fry until golden brown.";
+  }
+}
+
+class BostonCream < Doughnut {
+  cook() {
+    super.cook();
+    print "Pipe full of custard and coat with chocolate.";
+  }
+}
+
+BostonCream().cook();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains(
+            "Fry until golden brown.\nPipe full of custard and coat with chocolate.",
+        ));
+}
+
+#[test]
+fn super_can_be_used_to_call_overriden_method_multi_level() {
+    let src = r#"
+class Base {
+  method() {
+    print "Base.method()";
+  }
+}
+
+class Parent < Base {
+  method() {
+    super.method();
+  }
+}
+
+class Child < Parent {
+  method() {
+    super.method();
+  }
+}
+
+var parent = Parent();
+parent.method();
+var child = Child();
+child.method();
+"#;
+    let mut file = tempfile::NamedTempFile::new().unwrap();
+    writeln!(file, "{}", src).unwrap();
+
+    cargo_bin_cmd!("codecrafters-interpreter")
+        .args(["run"])
+        .arg(file.path())
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Base.method()\nBase.method()"));
+}
