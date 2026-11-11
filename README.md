@@ -16,6 +16,6 @@ The challenge is based on the first part of the book dedicated to jlox - Java im
 ## Sources and inspirations
 
 - [Crafting Interpreters](https://craftinginterpreters.com/) - the book, of course.
-- [Jon Gjengset](https://github.com/codecrafters-io/build-your-own-interpreter) - used as an inspiration when I've started this challenge, but was very careful to not "spoil" the actual solution to the problem - it finishes pretty early in the challenge, around parsing expressions and statements). It was the source that got me to research Pratt Parsing alghorithm.
+- [Jon Gjengset](https://github.com/codecrafters-io/build-your-own-interpreter) - used as an inspiration when I've started this challenge, but was very careful to not "spoil" the actual solution to the problem - it finishes pretty early in the challenge though, around parsing expressions and statements. It was the source that got me to research Pratt Parsing alghorithm. There is his video on YouTube [Implementing a Lox interpreter in Rust](https://www.youtube.com/watch?v=mNOLaw-_Buc), but I did not watch it for the reasons mentioned earlier.
 - [Simple but Powerful Pratt Parsing](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html) - main resource to understand and implement Pratt Parsing alghorithm in Rust.
 - [Pratt Parsing](https://www.youtube.com/watch?v=2l1Si4gSb9A) YouTube video by Colin James - was very helpful to visualize it.
