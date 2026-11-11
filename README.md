@@ -6,10 +6,11 @@ Features and highlights:
 
 - Zero LLM-generated code.
 - Pratt parser to parse expressions.
+- Lexer produces a stream of tokens instead of collecting everything in the vector like the book does in jlox.
 - Wrote additional tests more or less in TDD approach before commiting to CodeCrafters to confirm the stage completion.
 - All 84 stages from CodeCrafters completed, including optional sections.
 - Slow when using heavy recursive code, as expected.
-- Instead of optimizing this version, I've started to work on bytecode version of the interpreter (second part of the book - clox) without using CodeCrafters - [lox-bytecode-vm-rs](https://github.com/artemudovyk/lox-bytecode-vm-rs).
+- Instead of optimizing this version, I've switched to work on bytecode version of the interpreter (second part of the book - clox) without using CodeCrafters - [artemudovyk/lox-bytecode-vm-rs](https://github.com/artemudovyk/lox-bytecode-vm-rs) as this version was a stepping stone to a bytecode virtual machine.
 
 The challenge is based on the first part of the book dedicated to jlox - Java implementation of the interpreter with all the baggage that comes with it. Following this solution using Rust could be problematic when linked lists and lifetimes involved, but it's more or less follows the same structure. The Pratt parser I've used here was introduced in the second part of the book (clox implementation), but I've researched it earlier and decided to use it for this implementation instead of using Visitor pattern as proposed in the book. Other than that, almost everything else follows the book, including the Environment linked list and Resolver for local bindings (the latter was frustrating to work with if I'm being honest, as I've felt it wasn't idiomatic to Rust to begin with along with the tree-walking approach, but I've decided to finish this initial implementation as the book suggests).
 
