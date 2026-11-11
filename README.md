@@ -1,51 +1,21 @@
-[![progress-banner](https://backend.codecrafters.io/progress/interpreter/7d378354-536a-415c-bc31-25d89240025e)](https://app.codecrafters.io/users/artemudovyk?r=2qF)
+# Lox Tree-Walker Interpreter in Rust
 
-This is a starting point for Rust solutions to the
-["Build your own Interpreter" Challenge](https://app.codecrafters.io/courses/interpreter/overview).
+My solution to ["Build your own interpreter" challenge on CodeCrafters](https://app.codecrafters.io/courses/interpreter/overview) in Rust that is based on [Crafting Interpreters](https://craftinginterpreters.com/) book by Robert Nystrom.
 
-This challenge follows the book
-[Crafting Interpreters](https://craftinginterpreters.com/) by Robert Nystrom.
+Features and highlights:
 
-In this challenge you'll build an interpreter for
-[Lox](https://craftinginterpreters.com/the-lox-language.html), a simple
-scripting language. Along the way, you'll learn about tokenization, ASTs,
-tree-walk interpreters and more.
+- Zero LLM-generated code.
+- Pratt parser to parse expressions.
+- Wrote additional tests more or less in TDD approach before commiting to CodeCrafters to confirm the stage completion.
+- All 84 stages from CodeCrafters completed, including optional sections.
+- Slow when using heavy recursive code, as expected.
+- Instead of optimizing this version, I've started to work on bytecode version of the interpreter (second part of the book - clox) without using CodeCrafters - [lox-bytecode-vm-rs](https://github.com/artemudovyk/lox-bytecode-vm-rs).
 
-Before starting this challenge, make sure you've read the "Welcome" part of the
-book that contains these chapters:
+The challenge is based on the first part of the book dedicated to jlox - Java implementation of the interpreter with all the baggage that comes with it. Following this solution using Rust could be problematic when linked lists and lifetimes involved, but it's more or less follows the same structure. The Pratt parser I've used here was introduced in the second part of the book (clox implementation), but I've researched it earlier and decided to use it for this implementation instead of using Visitor pattern as proposed in the book. Other than that, almost everything else follows the book, including the Environment linked list and Resolver for local bindings (the latter was frustrating to work with if I'm being honest, as I've felt it wasn't idiomatic to Rust to begin with along with the tree-walking approach, but I've decided to finish this initial implementation as the book suggests).
 
-- [Introduction](https://craftinginterpreters.com/introduction.html) (chapter 1)
-- [A Map of the Territory](https://craftinginterpreters.com/a-map-of-the-territory.html)
-  (chapter 2)
-- [The Lox Language](https://craftinginterpreters.com/the-lox-language.html)
-  (chapter 3)
+## Sources and inspirations
 
-These chapters don't involve writing code, so they won't be covered in this
-challenge. This challenge will start from chapter 4,
-[Scanning](https://craftinginterpreters.com/scanning.html).
-
-**Note**: If you're viewing this repo on GitHub, head over to
-[codecrafters.io](https://codecrafters.io) to try the challenge.
-
-# Passing the first stage
-
-The entry point for your program is in `src/main.rs`. Study and uncomment the
-relevant code, and then run the command below to execute the tests on our
-servers:
-
-```sh
-codecrafters submit
-```
-
-Time to move on to the next stage!
-
-# Stage 2 & beyond
-
-Note: This section is for stages 2 and beyond.
-
-1. Ensure you have `cargo (1.96)` installed locally
-2. Run `./your_program.sh` to run your program, which is implemented in
-   `src/main.rs`. This command compiles your Rust project, so it might be slow
-   the first time you run it. Subsequent runs will be fast.
-3. Run `codecrafters submit` to submit your solution to CodeCrafters. Test
-   output will be streamed to your terminal.
+- [Crafting Interpreters](https://craftinginterpreters.com/) - the book, of course.
+- [Jon Gjengset](https://github.com/codecrafters-io/build-your-own-interpreter) - used as an inspiration when I've started this challenge, but was very careful to not "spoil" the actual solution to the problem - it finishes pretty early in the challenge, around parsing expressions and statements). It was the source that got me to research Pratt Parsing alghorithm.
+- [Simple but Powerful Pratt Parsing](https://matklad.github.io/2020/04/13/simple-but-powerful-pratt-parsing.html) - main resource to understand and implement Pratt Parsing alghorithm in Rust.
+- [Pratt Parsing](https://www.youtube.com/watch?v=2l1Si4gSb9A) YouTube video by Colin James - was very helpful to visualize it.
